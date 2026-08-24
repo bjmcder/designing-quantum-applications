@@ -224,6 +224,7 @@ __marimo__/
 # or a custom --filename landing in the repo)
 .qiskit/
 qiskit-ibm.json
+apikey.json
 qiskitrc
 Qconfig.py
 

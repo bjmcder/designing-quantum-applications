@@ -6,11 +6,37 @@ Run with no arguments to see usage and examples.
 
 import argparse
 import getpass
+import json
 import sys
+from pathlib import Path
 
 from qiskit_ibm_runtime import QiskitRuntimeService
 
 DEFAULT_CHANNEL = "ibm_quantum_platform"
+
+# Keys IBM Cloud has used for the API key string in a downloaded credentials
+# JSON file (e.g. apikey.json), checked in order.
+TOKEN_KEYS_IN_FILE = ["apikey", "api_key", "token", "key"]
+
+
+def load_token_from_file(path: str) -> str:
+    file_path = Path(path)
+    try:
+        data = json.loads(file_path.read_text())
+    except FileNotFoundError:
+        sys.exit(f"error: no such file: {file_path}")
+    except json.JSONDecodeError as exc:
+        sys.exit(f"error: {file_path} is not valid JSON: {exc}")
+
+    for key in TOKEN_KEYS_IN_FILE:
+        value = data.get(key)
+        if isinstance(value, str) and value:
+            return value
+
+    sys.exit(
+        f"error: couldn't find an API key in {file_path} "
+        f"(looked for keys: {', '.join(TOKEN_KEYS_IN_FILE)})"
+    )
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -25,16 +51,24 @@ def build_parser() -> argparse.ArgumentParser:
             "  python save_qiskit_token.py\n"
             "      (prompts for your token interactively)\n\n"
             "  python save_qiskit_token.py --token YOUR_API_KEY\n\n"
+            "  python save_qiskit_token.py --from-file ~/Downloads/apikey.json\n\n"
             "  python save_qiskit_token.py --token YOUR_API_KEY "
             "--instance CRN_OR_INSTANCE_NAME --name my-instance\n\n"
             "Get an API key from https://quantum.cloud.ibm.com/"
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument(
+    token_source = parser.add_mutually_exclusive_group()
+    token_source.add_argument(
         "--token",
-        help="IBM Quantum API token. If omitted, you will be prompted "
-        "(input is hidden).",
+        help="IBM Quantum API token. If omitted (and --from-file is not "
+        "used), you will be prompted (input is hidden).",
+    )
+    token_source.add_argument(
+        "--from-file",
+        metavar="PATH",
+        help="Path to a credentials JSON file downloaded from the IBM "
+        "Quantum/Cloud dashboard (e.g. apikey.json) to read the token from.",
     )
     parser.add_argument(
         "--channel",
@@ -80,7 +114,10 @@ def main() -> int:
 
     args = parser.parse_args()
 
-    token = args.token or getpass.getpass("Enter your IBM Quantum API token: ")
+    if args.from_file:
+        token = load_token_from_file(args.from_file)
+    else:
+        token = args.token or getpass.getpass("Enter your IBM Quantum API token: ")
     if not token:
         parser.error("a token is required (pass --token or enter it at the prompt)")
 
