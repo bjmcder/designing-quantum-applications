@@ -35,7 +35,7 @@ and Windows Subsystem for Linux (WSL).
 
 3. **Verify the install:**
    ```
-   uv run check_qiskit_install.py
+   uv run 00-Setup-Start-Here/01_check_install.py
    ```
    All checks should print `[OK]`. If something fails, re-run `uv sync` and
    try again before asking for help.
@@ -49,15 +49,49 @@ and Windows Subsystem for Linux (WSL).
    Then save it locally with whichever matches what you did above:
    ```
    # If you copied the key, paste it when prompted
-   uv run save_qiskit_token.py
+   uv run 00-Setup-Start-Here/02_save_token.py
 
    # If you downloaded apikey.json, point the script at it directly
-   uv run save_qiskit_token.py --from-file ~/Downloads/apikey.json
+   uv run 00-Setup-Start-Here/02_save_token.py --from-file ~/Downloads/apikey.json
    ```
-   The script saves your credentials to `~/.qiskit/qiskit-ibm.json` and verifies the connection.
+   The script saves your credentials to `~/.qiskit/qiskit-ibm.json`.
    `apikey.json` itself is never copied into this repo, and is git-ignored if you download it here by mistake. Never share your API key with anyone or allow it to be committed to a version control repository (e.g. Git).
 
-5. **Run notebooks:**
+5. **Verify the token and check your instance:**
+   ```
+   uv run 00-Setup-Start-Here/03_check_token.py
+   ```
+   This connects with the credentials you just saved and lists every
+   instance you have access to.
+
+   **If you have access to more than one instance** (e.g. a personal
+   instance plus the one dedicated to this class), this list is how you
+   find its name. Note the name of the class instance, then re-run
+   `02_save_token.py` pointing at it so it becomes your default:
+   ```
+   uv run 00-Setup-Start-Here/02_save_token.py --instance "<class instance name>" --overwrite
+   ```
+   (`--instance` accepts either a CRN or a display name — a name is looked
+   up and resolved automatically. This is unrelated to `--set-as-default`,
+   which instead picks a default *account* when you've saved more than one
+   under different `--name`s.)
+   Run `uv run 00-Setup-Start-Here/03_check_token.py` again afterward to
+   confirm it's now marked as the default.
+
+6. **Run a real circuit:**
+   ```
+   uv run 00-Setup-Start-Here/04_test_quantum.py
+   ```
+   Builds a Bell state and runs it first on a local, noiseless Aer
+   simulator, then on the class's IBM hardware backend, 10,000 shots each.
+   The hardware queue can be long — if the script loses its connection
+   (or you close your laptop) while waiting, the job keeps running on
+   IBM's servers. Fetch the result later instead of resubmitting:
+   ```
+   uv run 00-Setup-Start-Here/05_retrieve_job.py
+   ```
+
+7. **Run notebooks:**
    ```
    uv run jupyter lab
    ```
@@ -82,13 +116,28 @@ pip install -r requirements.txt
 ```
 `requirements.txt` is generated from the same lockfile as the `uv` path, so
 you'll get the same tested versions. Whatever environment you use, run
-`python check_qiskit_install.py` (or `python3`, depending on your setup) to
-confirm everything is installed correctly before class.
+`python 00-Setup-Start-Here/01_check_install.py` (or `python3`, depending
+on your setup) to confirm everything is installed correctly before class.
 
 ## Scripts
 
-- [`check_qiskit_install.py`](check_qiskit_install.py) — verifies your
-  environment has compatible versions of Qiskit, Qiskit IBM Runtime, and
-  Qiskit Aer, and runs a real test circuit to confirm the simulator works.
-- [`save_qiskit_token.py`](save_qiskit_token.py) — saves your IBM Quantum
-  API token locally so `QiskitRuntimeService()` can find it automatically.
+All in [`00-Setup-Start-Here/`](00-Setup-Start-Here/), meant to be run in order the first time:
+
+- [`01_check_install.py`](00-Setup-Start-Here/01_check_install.py) —
+  verifies your environment has compatible versions of Qiskit, Qiskit IBM
+  Runtime, and Qiskit Aer, and runs a real test circuit to confirm the
+  simulator works.
+- [`02_save_token.py`](00-Setup-Start-Here/02_save_token.py) — saves your
+  IBM Quantum API token locally so `QiskitRuntimeService()` can find it
+  automatically.
+- [`03_check_token.py`](00-Setup-Start-Here/03_check_token.py) — connects
+  with a saved token to confirm it works, and lists every instance you
+  have access to (and which one is your default).
+- [`04_test_quantum.py`](00-Setup-Start-Here/04_test_quantum.py) — builds
+  a Bell state and runs it on both the Aer simulator and real IBM
+  hardware, showing named registers, named circuits, PUBs, samplers, job
+  submission/retrieval, and post-processing. Saves the job ID locally as
+  soon as it's submitted so a lost connection doesn't lose the job.
+- [`05_retrieve_job.py`](00-Setup-Start-Here/05_retrieve_job.py) — fetches
+  the result of a previously submitted hardware job (by ID, or the most
+  recent one by default) without resubmitting it.

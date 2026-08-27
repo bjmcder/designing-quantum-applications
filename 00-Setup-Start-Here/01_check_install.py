@@ -89,13 +89,18 @@ def check_aer(verbose: bool) -> tuple[bool, str]:
     return True, f"qiskit-aer {version}{detail}"
 
 
-def main() -> int:
+def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Check that this environment has everything needed for the course."
     )
     parser.add_argument(
         "-v", "--verbose", action="store_true", help="Print extra detail for each check."
     )
+    return parser
+
+
+def main() -> int:
+    parser = build_parser()
     args = parser.parse_args()
 
     print("Checking Python environment for Qiskit coursework...\n")
@@ -122,8 +127,12 @@ def main() -> int:
     if failures:
         print(f"{len(failures)} check(s) failed.")
         print(
-            'Try: pip install -U "qiskit[visualization]>={}" '
-            '"qiskit-ibm-runtime>={}" qiskit-aer'.format(
+            "If you're using uv (the recommended setup): re-run `uv sync` "
+            "from the repo root, then try this script again."
+        )
+        print(
+            'If you installed with plain pip/conda instead: try `pip install -U '
+            '"qiskit[visualization]>={}" "qiskit-ibm-runtime>={}" qiskit-aer`'.format(
                 MIN_VERSIONS["qiskit"], MIN_VERSIONS["qiskit-ibm-runtime"]
             )
         )
