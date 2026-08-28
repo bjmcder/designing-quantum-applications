@@ -1,17 +1,84 @@
 # Designing Quantum Applications
 
-MANE 4960, Fall 2026
+Course Code: MANE-4960
+Semester: Fall 2026
+Instructor: Brian McDermott
+
+## Getting This Repo (New to Git/GitHub?)
+
+The setup steps below assume you have a local copy of this repo. If you've
+never used Git or GitHub before, here's what that means and how to do it.
+
+**Option 1: Download a ZIP (simplest, no Git required)**
+
+1. On the GitHub page for this repo, click the green **Code** button, then
+   **Download ZIP**.
+2. Unzip it somewhere on your computer (e.g. your Documents folder).
+3. Open a terminal (macOS/Linux) or PowerShell (Windows) and `cd` into the
+   unzipped folder before continuing to the [Setup](#setup) steps below.
+
+**Note:** You won't be able to easily pull updates as this repo changes
+during the semester, you will need to re-download the latest version.
+
+**Option 2: Clone with Git (recommended, lets you pull updates)**
+
+1. **Install Git**, if you don't already have it:
+   - macOS: install [Xcode Command Line Tools](https://developer.apple.com/xcode/resources/)
+     (`xcode-select --install`) or install via [Homebrew](https://brew.sh/):
+     `brew install git`.
+   - Linux: `sudo apt install git` (Debian/Ubuntu) or your distro's
+     equivalent.
+   - Windows: install [Git for Windows](https://git-scm.com/download/win),
+     which also gives you "Git Bash," a terminal you can use for the rest of
+     these instructions.
+   - WSL: same as Linux, inside your WSL distro.
+2. **Clone the repo.** Open a terminal, navigate to wherever you want the
+   folder to live (e.g. `cd ~/Documents`), then run:
+   ```
+   git clone <repo-url>
+   ```
+   (Use the URL from the green **Code** button on the GitHub page — copy
+   the HTTPS link.) This creates a folder with a full copy of the repo,
+   including its history.
+3. **Move into the folder** before continuing to the [Setup](#setup) steps
+   below:
+   ```
+   cd F2026
+   ```
+4. **Pulling updates later:** if changes are pushed to the repo during the
+   semester, get them by running this from inside the folder:
+   ```
+   git pull
+   ```
+
+You won't be expected to know anything else about Git for this class. However,
+it's an extremely powerful tool for tracking and working with complex projects. If you're
+curious to learn more, GitHub's own
+[Git and GitHub basics guide](https://docs.github.com/en/get-started/quickstart)
+is a good starting point.
 
 ## Setup
 
-You need a working Python environment with Qiskit before the first class. Pick
-whichever path fits you — they all end up with the same package versions.
+You need a working Python environment with Qiskit. Pick whichever of the following
+options you feel most comfortable with:
 
 ### Option A: Local Installation With `uv`
 
 This repo uses [`uv`](https://docs.astral.sh/uv/) to pin an identical set of
 package versions that give a consistent experience on Windows, macOS, Linux,
 and Windows Subsystem for Linux (WSL).
+
+**Shortcut:** steps 1–3 below (install `uv`, sync the environment, verify
+the install) are automated by a bootstrap script. From the repo root:
+```
+# macOS / Linux / WSL
+bash 00-Setup-Start-Here/bootstrap.sh
+
+# Windows (PowerShell)
+powershell -ExecutionPolicy ByPass -File 00-Setup-Start-Here\bootstrap.ps1
+```
+It's safe to re-run any time. If you'd rather run each step yourself (or
+want to understand what it's doing), follow steps 1–3 manually below.
 
 1. **Install `uv`** (one-time, skip if you already have it):
    - macOS / Linux / WSL:
@@ -123,6 +190,10 @@ on your setup) to confirm everything is installed correctly before class.
 
 All in [`00-Setup-Start-Here/`](00-Setup-Start-Here/), meant to be run in order the first time:
 
+- [`bootstrap.sh`](00-Setup-Start-Here/bootstrap.sh) /
+  [`bootstrap.ps1`](00-Setup-Start-Here/bootstrap.ps1) — one-stop setup
+  script for Option A: installs `uv` if it's missing, runs `uv sync`, and
+  runs `01_check_install.py` to confirm everything worked.
 - [`01_check_install.py`](00-Setup-Start-Here/01_check_install.py) —
   verifies your environment has compatible versions of Qiskit, Qiskit IBM
   Runtime, and Qiskit Aer, and runs a real test circuit to confirm the
@@ -141,3 +212,9 @@ All in [`00-Setup-Start-Here/`](00-Setup-Start-Here/), meant to be run in order 
 - [`05_retrieve_job.py`](00-Setup-Start-Here/05_retrieve_job.py) — fetches
   the result of a previously submitted hardware job (by ID, or the most
   recent one by default) without resubmitting it.
+
+## License
+
+Source code in this repository is licensed under the [MIT License](LICENSE).
+All other course materials (slides, notes, problem sets, etc.) are licensed
+under [CC BY 4.0](LICENSE-CONTENT).
