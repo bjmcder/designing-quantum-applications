@@ -7,12 +7,27 @@ more than one, e.g. a personal instance plus one dedicated to a class).
 """
 
 import argparse
+import logging
 import sys
 
 from qiskit_ibm_runtime import QiskitRuntimeService
 
+logging.basicConfig(
+    level=logging.WARN,
+    format="[%(levelname)-8s] %(name)s: %(message)s",
+)
+# Suppress harmless Qiskit warnings about instance discovery
+logging.getLogger("qiskit_runtime_service").setLevel(logging.ERROR)
+
 
 def build_parser() -> argparse.ArgumentParser:
+    """Create and configure the command-line argument parser.
+
+    Returns
+    -------
+    argparse.ArgumentParser
+        The configured argument parser for checking saved accounts.
+    """
     parser = argparse.ArgumentParser(
         description="Check a saved IBM Quantum account and list accessible instances.",
     )
@@ -25,6 +40,13 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main() -> int:
+    """Check a saved IBM Quantum account and list accessible instances.
+
+    Returns
+    -------
+    int
+        Exit code: 0 on success, 1 if the account is not found or connection fails.
+    """
     parser = build_parser()
     args = parser.parse_args()
 

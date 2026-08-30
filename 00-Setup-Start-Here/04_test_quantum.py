@@ -16,7 +16,9 @@ Run with no arguments. Pass --skip-hardware to run only the simulator step.
 """
 
 import argparse
+import logging
 import sys
+import time
 
 from qiskit import ClassicalRegister, QuantumCircuit, QuantumRegister
 from qiskit.transpiler.preset_passmanagers import generate_preset_pass_manager
@@ -26,22 +28,39 @@ from qiskit_ibm_runtime import SamplerV2 as RuntimeSampler
 
 from _job_state import DEFAULT_POLL_INTERVAL, extract_counts, save_last_job, wait_for_job
 
+logging.basicConfig(
+    level=logging.WARN,
+    format="[%(levelname)-8s] %(name)s: %(message)s",
+)
+# Suppress harmless Qiskit warnings about instance discovery
+logging.getLogger("qiskit_runtime_service").setLevel(logging.ERROR)
+
 DEFAULT_SHOTS = 10000
 DEFAULT_BACKEND = "ibm_rensselaer"
 
 
 def build_bell_circuit() -> QuantumCircuit:
-    # Step 1: named registers. Naming them makes the circuit diagram and
+    """Build a Bell state quantum circuit with named registers.
+
+    Constructs a two-qubit circuit that creates an entangled Bell state
+    (|00⟩ + |11⟩)/√2 and measures both qubits.
+
+    Returns
+    -------
+    QuantumCircuit
+        A named Bell state circuit with 2 qubits and 2 classical bits.
+    """
+    # Step 1: Create named registers. Naming them makes the circuit diagram and
     # the post-processing results (pub_result.data.<name>) self-explanatory
     # instead of falling back to generic names like "q" and "c0".
     qubits = QuantumRegister(2, name="q")
     bits = ClassicalRegister(2, name="meas")
 
-    # Step 2: a named circuit, built from those registers.
+    # Step 2: Create a named circuit, built from those registers.
     circuit = QuantumCircuit(qubits, bits, name="bell_state")
 
-    # Step 3: the Bell state itself. H puts qubit 0 into superposition, then
-    # CX entangles it with qubit 1.
+    # Step 3: Create the Bell state itself. H puts qubit 0 into superposition,
+    # then CX entangles it with qubit 1.
     circuit.h(qubits[0])
     circuit.cx(qubits[0], qubits[1])
     circuit.measure(qubits, bits)
@@ -50,7 +69,22 @@ def build_bell_circuit() -> QuantumCircuit:
 
 
 def run_on_aer(circuit: QuantumCircuit, shots: int) -> dict:
+    """Run a quantum circuit on the Aer simulator.
+
+    Parameters
+    ----------
+    circuit : QuantumCircuit
+        The quantum circuit to simulate.
+    shots : int
+        Number of shots (repetitions) for sampling.
+
+    Returns
+    -------
+    dict
+        Dictionary mapping bitstrings to their measurement counts.
+    """
     print(f"\n--- Running on a perfect (noiseless) Aer simulator, {shots} shots ---")
+    start_time = time.perf_counter()
 
     # Step 4: a PUB (Primitive Unified Bloc) is what you hand to a sampler.
     # A PUB is a tuple of (circuit, [parameter values], [shots]) -- here
@@ -73,7 +107,10 @@ def run_on_aer(circuit: QuantumCircuit, shots: int) -> dict:
     pub_result = result[0]
     _, counts = extract_counts(pub_result)
 
+    elapsed = time.perf_counter() - start_time
+    print(f"\n*** Simulator job completed! ***")
     print(f"Counts: {counts}")
+    print(f"Elapsed time: {elapsed:.2f}s")
     return counts
 
 
@@ -84,7 +121,32 @@ def run_on_hardware(
     account_name: str,
     poll_interval: int = DEFAULT_POLL_INTERVAL,
 ) -> dict | None:
+    """Run a quantum circuit on IBM hardware via Qiskit Runtime.
+
+    Transpiles the circuit for the target backend, submits the job, and waits
+    for results. The job ID is saved to disk for recovery if interrupted.
+
+    Parameters
+    ----------
+    circuit : QuantumCircuit
+        The quantum circuit to run.
+    shots : int
+        Number of shots (repetitions) for sampling.
+    backend_name : str
+        Name of the IBM backend (e.g., "ibm_rensselaer").
+    account_name : str
+        Name of the saved IBM Quantum account.
+    poll_interval : int, optional
+        Seconds between status checks while waiting (default: DEFAULT_POLL_INTERVAL).
+
+    Returns
+    -------
+    dict or None
+        Dictionary mapping bitstrings to counts if successful, None if the
+        connection failed or the job was interrupted.
+    """
     print(f"\n--- Running on IBM hardware backend '{backend_name}', {shots} shots ---")
+    start_time = time.perf_counter()
 
     try:
         service = QiskitRuntimeService(name=account_name)
@@ -102,12 +164,15 @@ def run_on_hardware(
     print(f"Connected to {backend.name} ({backend.num_qubits} qubits)")
 
     # Extra step, only needed for real hardware: convert to an ISA
-    # (Instruction Set Architecture) circuit -- transpiled into this
+    # (Instruction Set Architecture) circuit that is transpiled into this
     # backend's actual basis gates and qubit connectivity. The simulator
     # above skipped this because it supports every gate directly and has
     # no connectivity restrictions.
+    transpile_start = time.perf_counter()
     pass_manager = generate_preset_pass_manager(backend=backend, optimization_level=1)
     isa_circuit = pass_manager.run(circuit)
+    transpile_time = time.perf_counter() - transpile_start
+    print(f"Transpiled circuit in {transpile_time:.2f}s")
 
     # Steps 4-5 again, this time targeting real hardware: same PUB shape,
     # but the sampler now runs in "backend mode" against the IBM backend.
@@ -124,7 +189,7 @@ def run_on_hardware(
         "If this script is interrupted, retrieve the result later with:\n"
         "  uv run 05_retrieve_job.py"
     )
-    print(f"Waiting for it to run (checking every {poll_interval}s)...")
+    print(f"Waiting for job results (checking every {poll_interval}s)...")
 
     try:
         result = wait_for_job(job, backend, poll_interval=poll_interval)
@@ -147,11 +212,21 @@ def run_on_hardware(
     pub_result = result[0]
     _, counts = extract_counts(pub_result)
 
+    elapsed = time.perf_counter() - start_time
+    print(f"\n*** Hardware job completed! ***")
     print(f"Counts: {counts}")
+    print(f"Total elapsed time: {elapsed:.2f}s")
     return counts
 
 
 def build_parser() -> argparse.ArgumentParser:
+    """Create and configure the command-line argument parser.
+
+    Returns
+    -------
+    argparse.ArgumentParser
+        The configured argument parser for running quantum circuits.
+    """
     parser = argparse.ArgumentParser(
         description="Build a Bell state and run it on Aer, then on real IBM hardware.",
     )
@@ -178,10 +253,21 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main() -> int:
+    """Build a Bell state and run it on a simulator, then on real IBM hardware.
+
+    Returns
+    -------
+    int
+        Exit code: always 0 (failures are reported but don't block completion).
+    """
     parser = build_parser()
     args = parser.parse_args()
+    overall_start = time.perf_counter()
 
+    circuit_start = time.perf_counter()
     circuit = build_bell_circuit()
+    circuit_time = time.perf_counter() - circuit_start
+    print(f"Circuit built in {circuit_time:.2f}s")
     print("Circuit:")
     print(circuit.draw(output="text"))
 
@@ -193,12 +279,14 @@ def main() -> int:
             circuit, args.shots, args.backend, args.name, poll_interval=args.poll_interval
         )
 
+    overall_time = time.perf_counter() - overall_start
     print("\n=== Summary ===")
     print(f"Aer (ideal) counts:       {aer_counts}")
     if hardware_counts is not None:
         print(f"{args.backend} counts: {hardware_counts}")
     elif not args.skip_hardware:
         print(f"{args.backend}: run failed or was unreachable (see above).")
+    print(f"\nTotal program time: {overall_time:.2f}s")
 
     return 0
 

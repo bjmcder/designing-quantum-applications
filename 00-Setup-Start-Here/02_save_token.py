@@ -9,10 +9,18 @@ is selected.
 import argparse
 import getpass
 import json
+import logging
 import sys
 from pathlib import Path
 
 from qiskit_ibm_runtime import QiskitRuntimeService
+
+logging.basicConfig(
+    level=logging.WARN,
+    format="[%(levelname)-8s] %(name)s: %(message)s",
+)
+# Suppress harmless Qiskit warnings about instance discovery
+logging.getLogger("qiskit_runtime_service").setLevel(logging.ERROR)
 
 DEFAULT_CHANNEL = "ibm_quantum_platform"
 
@@ -22,6 +30,23 @@ TOKEN_KEYS_IN_FILE = ["apikey", "api_key", "token", "key"]
 
 
 def load_token_from_file(path: str) -> str:
+    """Load an IBM Quantum API token from a credentials JSON file.
+
+    Parameters
+    ----------
+    path : str
+        Path to the credentials JSON file (e.g., apikey.json).
+
+    Returns
+    -------
+    str
+        The API token string extracted from the file.
+
+    Raises
+    ------
+    SystemExit
+        If the file is not found, is invalid JSON, or does not contain an API key.
+    """
     file_path = Path(path)
     try:
         data = json.loads(file_path.read_text())
@@ -41,24 +66,68 @@ def load_token_from_file(path: str) -> str:
     )
 
 
+def list_available_instances(token: str, channel: str) -> list[dict]:
+    """Fetch the instances accessible with the given token.
+
+    Parameters
+    ----------
+    token : str
+        The IBM Quantum API token.
+    channel : str
+        The account channel (e.g., "ibm_quantum_platform" or "ibm_cloud").
+
+    Returns
+    -------
+    list[dict]
+        Instance dictionaries as returned by QiskitRuntimeService.instances(),
+        each with (at least) "name", "crn", and "plan" keys.
+
+    Raises
+    ------
+    SystemExit
+        If the instances can't be listed with the given token.
+    """
+    try:
+        probe = QiskitRuntimeService(channel=channel, token=token, instance="auto")
+        return probe.instances()
+    except Exception as exc:  # noqa: BLE001 - report any connection failure to the user
+        sys.exit(f"error: couldn't verify instances with this token: {exc}")
+
+
 def resolve_instance_crn(token: str, channel: str, instance: str) -> str:
     """Resolve an instance name to its CRN.
 
-    QiskitRuntimeService.save_account()'s docstring says --instance accepts
+    QiskitRuntimeService.save_account()'s docstring says "instance accepts
     either a CRN or a display name, but the service only ever validates a
-    *CRN* against your accessible instances when it's next instantiated --
-    a name saved as-is silently fails to take effect (or later raises a
-    confusing "account does not have access" error). Resolve names here so
-    --instance works with either, the way it's documented to.
+    *CRN* against your accessible instances when it's next instantiated."
+
+    This means that a name saved as-is silently fails to take effect (or later
+    raises a confusing "account does not have access" error). Resolve names
+    here so the `--instance` argument works with either.
+
+    Parameters
+    ----------
+    token : str
+        The IBM Quantum API token.
+    channel : str
+        The account channel (e.g., "ibm_quantum_platform" or "ibm_cloud").
+    instance : str
+        The instance identifier; either a CRN (starting with "crn:") or a display name.
+
+    Returns
+    -------
+    str
+        The Cloud Resource Name (CRN) of the instance.
+
+    Raises
+    ------
+    SystemExit
+        If the instance name cannot be resolved or is not accessible with the given token.
     """
     if instance.startswith("crn:"):
         return instance
 
-    try:
-        probe = QiskitRuntimeService(channel=channel, token=token)
-        available = probe.instances()
-    except Exception as exc:  # noqa: BLE001 - report any connection failure to the user
-        sys.exit(f"error: couldn't verify instances with this token: {exc}")
+    available = list_available_instances(token, channel)
 
     matches = [inst for inst in available if inst.get("name") == instance]
     if not matches:
@@ -68,12 +137,70 @@ def resolve_instance_crn(token: str, channel: str, instance: str) -> str:
             f"token. Available instances: {names}"
         )
 
-    crn = matches[0]["crn"]
-    print(f"Resolved instance name '{instance}' to CRN: {crn}")
-    return crn
+    match = matches[0]
+    if match.get("plan") != "on-prem":
+        print(
+            f"warning: instance '{instance}' has plan '{match.get('plan')}', "
+            "not 'on-prem' -- this course uses an on-prem instance."
+        )
+    print(f"Resolved instance name '{instance}' to CRN: {match['crn']}")
+    return match["crn"]
+
+
+def auto_select_onprem_instance(token: str, channel: str) -> str | None:
+    """Automatically pick the on-prem instance used for this course.
+
+    Called when the user doesn't pass --instance explicitly. Without an
+    instance set, IBM prioritizes free/trial plan instances over the
+    on-prem instance dedicated to this course, so look it up instead of
+    leaving the default to chance.
+
+    Parameters
+    ----------
+    token : str
+        The IBM Quantum API token.
+    channel : str
+        The account channel (e.g., "ibm_quantum_platform" or "ibm_cloud").
+
+    Returns
+    -------
+    str or None
+        The CRN of the on-prem instance, or None if none (or more than one)
+        is accessible with this token -- a warning is printed in that case
+        and the caller should fall back to leaving no default instance set.
+    """
+    available = list_available_instances(token, channel)
+    onprem = [inst for inst in available if inst.get("plan") == "on-prem"]
+
+    if not onprem:
+        print(
+            "warning: no on-prem instance is accessible with this token; "
+            "leaving no default instance set. Once you know its name, set "
+            "one explicitly with --instance."
+        )
+        return None
+
+    if len(onprem) > 1:
+        names = ", ".join(inst.get("name") for inst in onprem)
+        print(
+            f"warning: multiple on-prem instances are accessible ({names}); "
+            "leaving no default instance set. Pick one explicitly with --instance."
+        )
+        return None
+
+    inst = onprem[0]
+    print(f"Auto-selected on-prem instance '{inst.get('name')}' for this course.")
+    return inst["crn"]
 
 
 def build_parser() -> argparse.ArgumentParser:
+    """Create and configure the command-line argument parser.
+
+    Returns
+    -------
+    argparse.ArgumentParser
+        The configured argument parser for token saving.
+    """
     parser = argparse.ArgumentParser(
         prog="02_save_token.py",
         description=(
@@ -115,7 +242,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--instance",
         help="CRN or display name of the instance to use as the default "
-        "(a name is looked up and resolved to its CRN automatically).",
+        "(a name is looked up and resolved to its CRN automatically). If "
+        "omitted, the on-prem instance for this course is auto-selected.",
     )
     parser.add_argument(
         "--name",
@@ -140,6 +268,13 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main() -> int:
+    """Save an IBM Quantum API token to local Qiskit Runtime credentials.
+
+    Returns
+    -------
+    int
+        Exit code: 0 on success, 1 on error.
+    """
     parser = build_parser()
 
     if len(sys.argv) == 1:
@@ -158,6 +293,8 @@ def main() -> int:
     instance = args.instance
     if instance:
         instance = resolve_instance_crn(token, args.channel, instance)
+    else:
+        instance = auto_select_onprem_instance(token, args.channel)
 
     QiskitRuntimeService.save_account(
         token=token,
