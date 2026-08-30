@@ -188,7 +188,7 @@ def auto_select_onprem_instance(token: str, channel: str) -> str | None:
         names = ", ".join(inst.get("name") for inst in onprem)
         print(
             f"warning: multiple on-prem instances are accessible ({names}); "
-            "leaving no default instance set. Use --instance to pick one."
+            "No default instance was set. Use --instance to pick one."
         )
         return None
 

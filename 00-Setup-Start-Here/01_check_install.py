@@ -13,7 +13,7 @@ import re
 import sys
 from importlib import metadata
 
-MIN_PYTHON = (3, 10)
+MIN_PYTHON = (3, 12)
 
 # package name in pip -> minimum required version
 MIN_VERSIONS = {
@@ -169,6 +169,8 @@ def check_aer(verbose: bool) -> tuple[bool, str]:
     if version is None:
         return False, "qiskit-aer is not installed"
     try:
+
+        # A small inline program that import Aer and runs a test circuit
         from qiskit import QuantumCircuit, transpile
         from qiskit_aer import AerSimulator
 
@@ -227,6 +229,7 @@ def main() -> int:
 
     print("Checking Python environment ...\n")
 
+    # Collect all the checks to be performed
     checks = [
         check_python(),
         check_min_version("qiskit", MIN_VERSIONS["qiskit"]),
@@ -240,6 +243,7 @@ def main() -> int:
         check_min_version("rustworkx", MIN_VERSIONS["rustworkx"]),
     ]
 
+    # Run the checks and report success/failure
     failures = []
     for ok, message in checks:
         status = "OK  " if ok else "FAIL"
@@ -247,7 +251,9 @@ def main() -> int:
         if not ok:
             failures.append(message)
 
-    print()
+    print() # Newline
+
+    # Report the failures and suggested fixes
     if failures:
         print(f"{len(failures)} check(s) failed.")
         print(
