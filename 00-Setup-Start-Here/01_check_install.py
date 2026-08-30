@@ -29,14 +29,52 @@ VISUALIZATION_EXTRAS = ["matplotlib", "pylatexenc", "Pillow", "pydot", "seaborn"
 
 
 def parse_version(version: str) -> tuple:
+    """Extract version numbers from a version string as a tuple of integers.
+
+    Parameters
+    ----------
+    version : str
+        Version string (e.g., "1.2.3" or "2.0.0rc1").
+
+    Returns
+    -------
+    tuple
+        Tuple of integers extracted from the version string.
+    """
     return tuple(int(x) for x in re.findall(r"\d+", version)) or (0,)
 
 
 def version_at_least(installed: str, minimum: str) -> bool:
+    """Check if installed version is greater than or equal to the minimum required version.
+
+    Parameters
+    ----------
+    installed : str
+        The installed version string.
+    minimum : str
+        The minimum required version string.
+
+    Returns
+    -------
+    bool
+        True if installed version >= minimum version, False otherwise.
+    """
     return parse_version(installed) >= parse_version(minimum)
 
 
 def installed_version(dist_name: str) -> str | None:
+    """Return the installed version of a package, or None if not installed.
+
+    Parameters
+    ----------
+    dist_name : str
+        The distribution/package name.
+
+    Returns
+    -------
+    str or None
+        The installed version string, or None if the package is not found.
+    """
     try:
         return metadata.version(dist_name)
     except metadata.PackageNotFoundError:
@@ -44,6 +82,13 @@ def installed_version(dist_name: str) -> str | None:
 
 
 def check_python() -> tuple[bool, str]:
+    """Verify Python version meets minimum requirement.
+
+    Returns
+    -------
+    tuple[bool, str]
+        A tuple of (passed: bool, message: str).
+    """
     version = ".".join(str(v) for v in sys.version_info[:3])
     ok = sys.version_info[:2] >= MIN_PYTHON
     required = ".".join(str(v) for v in MIN_PYTHON)
@@ -51,6 +96,20 @@ def check_python() -> tuple[bool, str]:
 
 
 def check_min_version(dist_name: str, minimum: str) -> tuple[bool, str]:
+    """Check if a distribution is installed with the required minimum version.
+
+    Parameters
+    ----------
+    dist_name : str
+        The distribution/package name.
+    minimum : str
+        The minimum required version string.
+
+    Returns
+    -------
+    tuple[bool, str]
+        A tuple of (passed: bool, message: str).
+    """
     version = installed_version(dist_name)
     if version is None:
         return False, f"{dist_name} is not installed (>= {minimum} required)"
@@ -59,6 +118,18 @@ def check_min_version(dist_name: str, minimum: str) -> tuple[bool, str]:
 
 
 def check_visualization_extras(verbose: bool) -> tuple[bool, str]:
+    """Verify all qiskit visualization extra packages are installed.
+
+    Parameters
+    ----------
+    verbose : bool
+        If True, include detailed version information in the message.
+
+    Returns
+    -------
+    tuple[bool, str]
+        A tuple of (passed: bool, message: str).
+    """
     missing = [name for name in VISUALIZATION_EXTRAS if installed_version(name) is None]
     if missing:
         return False, f"qiskit[visualization] extras missing: {', '.join(missing)}"
@@ -70,6 +141,18 @@ def check_visualization_extras(verbose: bool) -> tuple[bool, str]:
 
 
 def check_aer(verbose: bool) -> tuple[bool, str]:
+    """Verify qiskit-aer is installed and a test circuit can be simulated.
+
+    Parameters
+    ----------
+    verbose : bool
+        If True, include test circuit results in the message.
+
+    Returns
+    -------
+    tuple[bool, str]
+        A tuple of (passed: bool, message: str).
+    """
     version = installed_version("qiskit-aer")
     if version is None:
         return False, "qiskit-aer is not installed"
@@ -90,6 +173,13 @@ def check_aer(verbose: bool) -> tuple[bool, str]:
 
 
 def build_parser() -> argparse.ArgumentParser:
+    """Create and configure the command-line argument parser.
+
+    Returns
+    -------
+    argparse.ArgumentParser
+        The configured argument parser.
+    """
     parser = argparse.ArgumentParser(
         description="Check that this environment has everything needed for the course."
     )
@@ -100,10 +190,17 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main() -> int:
+    """Run all environment checks and report results.
+
+    Returns
+    -------
+    int
+        Exit code: 0 if all checks passed, 1 if any checks failed.
+    """
     parser = build_parser()
     args = parser.parse_args()
 
-    print("Checking Python environment for Qiskit coursework...\n")
+    print("Checking Python environment ...\n")
 
     checks = [
         check_python(),
@@ -138,7 +235,7 @@ def main() -> int:
         )
         return 1
 
-    print("All checks passed. Your environment is ready for class.")
+    print("All checks passed. Your environment is ready!")
     return 0
 
 
