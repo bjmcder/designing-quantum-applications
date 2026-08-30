@@ -16,12 +16,26 @@ import sys
 
 from qiskit_ibm_runtime import QiskitRuntimeService
 
-from _job_state import DEFAULT_POLL_INTERVAL, extract_counts, load_last_job, wait_for_job
+from _job_state import (
+    DEFAULT_POLL_INTERVAL,
+    extract_counts,
+    load_last_job,
+    wait_for_job,
+)
 
 
 def build_parser() -> argparse.ArgumentParser:
+    """Create and configure the command-line argument parser.
+
+    Returns
+    -------
+    argparse.ArgumentParser
+        The configured argument parser for job retrieval.
+    """
     parser = argparse.ArgumentParser(
-        description="Retrieve results for a previously submitted IBM Quantum job.",
+        description=(
+            "Retrieve results for a previously submitted IBM Quantum job."
+        ),
     )
     parser.add_argument(
         "job_id",
@@ -45,6 +59,13 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main() -> int:
+    """Retrieve results for a previously submitted IBM Quantum job.
+
+    Returns
+    -------
+    int
+        Exit code: 0 on success, 1 if retrieval or connection failed.
+    """
     parser = build_parser()
     args = parser.parse_args()
 
@@ -70,24 +91,29 @@ def main() -> int:
     try:
         service = QiskitRuntimeService(name=account_name)
         job = service.job(job_id)
-    except Exception as exc:  # noqa: BLE001 - report any connection failure to the user
+    except Exception as exc:  # noqa: BLE001 - report connection failure
         print(f"Could not retrieve job '{job_id}': {exc}")
         return 1
 
     backend = job.backend()
-    print(f"Job {job_id} on {backend.name if backend else '?'}: status = {job.status()}")
+    backend_name = backend.name if backend else "?"
+    print(f"Job {job_id} on {backend_name}: status = {job.status()}")
 
     if not job.in_final_state():
-        print(f"Job is still queued or running (checking every {args.poll_interval}s)...")
+        interval = args.poll_interval
+        print(f"Job is still queued or running (checking every {interval}s)...")
 
     try:
         result = wait_for_job(job, backend, poll_interval=args.poll_interval)
     except (KeyboardInterrupt, Exception) as exc:
-        cause = "Cancelled." if isinstance(exc, KeyboardInterrupt) else f"Lost connection: {exc}"
+        if isinstance(exc, KeyboardInterrupt):
+            cause = "Cancelled."
+        else:
+            cause = f"Lost connection: {exc}"
         print(
             f"\n{cause} The job is still running on IBM's servers -- it "
-            "doesn't need this script to stay connected. Try again later "
-            f"with:\n  uv run 05_retrieve_job.py {job_id}"
+            "doesn't need this script to stay connected. Try again "
+            f"later with:\n  uv run 05_retrieve_job.py {job_id}"
         )
         return 1
 

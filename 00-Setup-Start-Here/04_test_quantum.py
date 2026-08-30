@@ -26,7 +26,12 @@ from qiskit_aer.primitives import SamplerV2 as AerSampler
 from qiskit_ibm_runtime import QiskitRuntimeService
 from qiskit_ibm_runtime import SamplerV2 as RuntimeSampler
 
-from _job_state import DEFAULT_POLL_INTERVAL, extract_counts, save_last_job, wait_for_job
+from _job_state import (
+    DEFAULT_POLL_INTERVAL,
+    extract_counts,
+    save_last_job,
+    wait_for_job,
+)
 
 logging.basicConfig(
     level=logging.WARN,
@@ -83,7 +88,10 @@ def run_on_aer(circuit: QuantumCircuit, shots: int) -> dict:
     dict
         Dictionary mapping bitstrings to their measurement counts.
     """
-    print(f"\n--- Running on a perfect (noiseless) Aer simulator, {shots} shots ---")
+    print(
+        f"\n--- Running on a perfect (noiseless) Aer simulator, "
+        f"{shots} shots ---"
+    )
     start_time = time.perf_counter()
 
     # Step 4: a PUB (Primitive Unified Bloc) is what you hand to a sampler.
@@ -137,7 +145,7 @@ def run_on_hardware(
     account_name : str
         Name of the saved IBM Quantum account.
     poll_interval : int, optional
-        Seconds between status checks while waiting (default: DEFAULT_POLL_INTERVAL).
+        Seconds between status checks (default: DEFAULT_POLL_INTERVAL).
 
     Returns
     -------
@@ -145,13 +153,16 @@ def run_on_hardware(
         Dictionary mapping bitstrings to counts if successful, None if the
         connection failed or the job was interrupted.
     """
-    print(f"\n--- Running on IBM hardware backend '{backend_name}', {shots} shots ---")
+    print(
+        f"\n--- Running on IBM hardware backend '{backend_name}', "
+        f"{shots} shots ---"
+    )
     start_time = time.perf_counter()
 
     try:
         service = QiskitRuntimeService(name=account_name)
         backend = service.backend(backend_name)
-    except Exception as exc:  # noqa: BLE001 - report any connection failure to the user
+    except Exception as exc:  # noqa: BLE001 - report connection failure
         print(f"Could not reach backend '{backend_name}': {exc}")
         print(
             "Check that 02_save_token.py has been run, and run "
@@ -169,7 +180,9 @@ def run_on_hardware(
     # above skipped this because it supports every gate directly and has
     # no connectivity restrictions.
     transpile_start = time.perf_counter()
-    pass_manager = generate_preset_pass_manager(backend=backend, optimization_level=1)
+    pass_manager = generate_preset_pass_manager(
+        backend=backend, optimization_level=1
+    )
     isa_circuit = pass_manager.run(circuit)
     transpile_time = time.perf_counter() - transpile_start
     print(f"Transpiled circuit in {transpile_time:.2f}s")
@@ -194,17 +207,20 @@ def run_on_hardware(
     try:
         result = wait_for_job(job, backend, poll_interval=poll_interval)
     except (KeyboardInterrupt, Exception) as exc:
-        cause = "Cancelled." if isinstance(exc, KeyboardInterrupt) else f"Lost connection: {exc}"
+        if isinstance(exc, KeyboardInterrupt):
+            cause = "Cancelled."
+        else:
+            cause = f"Lost connection: {exc}"
         print(
             f"\n{cause} The job (id: {job.job_id()}) is still running on IBM's "
             "servers -- it doesn't need this script to stay connected.\n"
             "To pick it back up:\n"
-            "  1. Reconnect (if you lost network/power), then open a terminal here.\n"
+            "  1. Reconnect (if needed), then open a terminal here.\n"
             "  2. Run:\n"
             "       uv run 05_retrieve_job.py\n"
-            f"     (or explicitly:  uv run 05_retrieve_job.py {job.job_id()})\n"
-            "  3. It will reconnect, show the job's current status, and wait "
-            "for it to finish if it hasn't already."
+            f"     (or:  uv run 05_retrieve_job.py {job.job_id()})\n"
+            "  3. It will reconnect, show the job's status, and wait "
+            "for it to finish if needed."
         )
         return None
 
@@ -228,26 +244,39 @@ def build_parser() -> argparse.ArgumentParser:
         The configured argument parser for running quantum circuits.
     """
     parser = argparse.ArgumentParser(
-        description="Build a Bell state and run it on Aer, then on real IBM hardware.",
+        description=(
+            "Build a Bell state and run it on Aer, then on IBM hardware."
+        ),
     )
     parser.add_argument(
-        "--shots", type=int, default=DEFAULT_SHOTS, help=f"Shots per run (default: {DEFAULT_SHOTS})."
+        "--shots",
+        type=int,
+        default=DEFAULT_SHOTS,
+        help=f"Shots per run (default: {DEFAULT_SHOTS}).",
     )
     parser.add_argument(
-        "--backend", default=DEFAULT_BACKEND, help=f"IBM backend to run on (default: {DEFAULT_BACKEND})."
+        "--backend",
+        default=DEFAULT_BACKEND,
+        help=f"IBM backend to run on (default: {DEFAULT_BACKEND}).",
     )
     parser.add_argument(
-        "--name", default="default", help="Name of the saved account to use (default: 'default')."
+        "--name",
+        default="default",
+        help="Name of the saved account to use (default: 'default').",
     )
     parser.add_argument(
-        "--skip-hardware", action="store_true", help="Only run on the Aer simulator."
+        "--skip-hardware",
+        action="store_true",
+        help="Only run on the Aer simulator.",
     )
     parser.add_argument(
         "--poll-interval",
         type=int,
         default=DEFAULT_POLL_INTERVAL,
-        help=f"Seconds between status/queue checks while waiting on hardware "
-        f"(default: {DEFAULT_POLL_INTERVAL}).",
+        help=(
+            f"Seconds between status/queue checks while waiting on "
+            f"hardware (default: {DEFAULT_POLL_INTERVAL})."
+        ),
     )
     return parser
 
@@ -276,7 +305,11 @@ def main() -> int:
     hardware_counts = None
     if not args.skip_hardware:
         hardware_counts = run_on_hardware(
-            circuit, args.shots, args.backend, args.name, poll_interval=args.poll_interval
+            circuit,
+            args.shots,
+            args.backend,
+            args.name,
+            poll_interval=args.poll_interval,
         )
 
     overall_time = time.perf_counter() - overall_start

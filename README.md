@@ -1,7 +1,9 @@
 # Designing Quantum Applications
 
 Course Code: MANE-4960
+
 Semester: Fall 2026
+
 Instructor: Brian McDermott
 
 ## Getting This Repo (New to Git/GitHub?)

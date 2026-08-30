@@ -29,7 +29,9 @@ def build_parser() -> argparse.ArgumentParser:
         The configured argument parser for checking saved accounts.
     """
     parser = argparse.ArgumentParser(
-        description="Check a saved IBM Quantum account and list accessible instances.",
+        description=(
+            "Check a saved IBM Quantum account and list accessible instances."
+        ),
     )
     parser.add_argument(
         "--name",
@@ -45,7 +47,8 @@ def main() -> int:
     Returns
     -------
     int
-        Exit code: 0 on success, 1 if the account is not found or connection fails.
+        Exit code: 0 on success, 1 if account not found or connection
+        fails.
     """
     parser = build_parser()
     args = parser.parse_args()
@@ -62,7 +65,7 @@ def main() -> int:
     try:
         service = QiskitRuntimeService(name=args.name)
         instances = service.instances()
-    except Exception as exc:  # noqa: BLE001 - report any connection failure to the user
+    except Exception as exc:  # noqa: BLE001 - report connection failure
         print(f"Connection failed: {exc}")
         print(
             "Your saved token may be invalid or expired. Get a new one and "
@@ -73,8 +76,13 @@ def main() -> int:
     print(f"Connected. Found {len(instances)} accessible instance(s):")
     for inst in instances:
         is_selected = default_instance in (inst.get("name"), inst.get("crn"))
-        marker = "  <-- default for this account" if default_instance and is_selected else ""
-        print(f"  - {inst.get('name')}  [plan: {inst.get('plan')}]{marker}")
+        if default_instance and is_selected:
+            marker = "  <-- default for this account"
+        else:
+            marker = ""
+        name = inst.get("name")
+        plan = inst.get("plan")
+        print(f"  - {name}  [plan: {plan}]{marker}")
 
     if not default_instance:
         print(

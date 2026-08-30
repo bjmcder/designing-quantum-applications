@@ -124,7 +124,10 @@ def wait_for_job(job, backend=None, poll_interval: int = DEFAULT_POLL_INTERVAL):
                 pending = None
 
         if pending is not None:
-            print(f"  status: {status} -- {pending} job(s) pending on {backend.name}")
+            print(
+                f"  status: {status} -- {pending} job(s) pending on "
+                f"{backend.name}"
+            )
         elif status != last_status:
             print(f"  status: {status}")
         last_status = status

@@ -25,7 +25,14 @@ MIN_VERSIONS = {
 }
 
 # distributions that make up `pip install qiskit[visualization]`
-VISUALIZATION_EXTRAS = ["matplotlib", "pylatexenc", "Pillow", "pydot", "seaborn", "sympy"]
+VISUALIZATION_EXTRAS = [
+    "matplotlib",
+    "pylatexenc",
+    "Pillow",
+    "pydot",
+    "seaborn",
+    "sympy",
+]
 
 
 def parse_version(version: str) -> tuple:
@@ -45,7 +52,7 @@ def parse_version(version: str) -> tuple:
 
 
 def version_at_least(installed: str, minimum: str) -> bool:
-    """Check if installed version is greater than or equal to the minimum required version.
+    """Check if installed version meets the minimum requirement.
 
     Parameters
     ----------
@@ -130,12 +137,17 @@ def check_visualization_extras(verbose: bool) -> tuple[bool, str]:
     tuple[bool, str]
         A tuple of (passed: bool, message: str).
     """
-    missing = [name for name in VISUALIZATION_EXTRAS if installed_version(name) is None]
+    missing = [
+        name for name in VISUALIZATION_EXTRAS if installed_version(name) is None
+    ]
     if missing:
-        return False, f"qiskit[visualization] extras missing: {', '.join(missing)}"
+        missing_str = ", ".join(missing)
+        return False, f"qiskit[visualization] extras missing: {missing_str}"
     detail = ""
     if verbose:
-        found = ", ".join(f"{n} {installed_version(n)}" for n in VISUALIZATION_EXTRAS)
+        found = ", ".join(
+            f"{n} {installed_version(n)}" for n in VISUALIZATION_EXTRAS
+        )
         detail = f" ({found})"
     return True, f"qiskit[visualization] extras installed{detail}"
 
@@ -164,11 +176,19 @@ def check_aer(verbose: bool) -> tuple[bool, str]:
         circuit.h(0)
         circuit.measure(0, 0)
         backend = AerSimulator()
-        result = backend.run(transpile(circuit, backend), shots=100).result()
+        transpiled = transpile(circuit, backend)
+        result = backend.run(transpiled, shots=100).result()
         counts = result.get_counts()
-    except Exception as exc:  # noqa: BLE001 - surface any simulator failure to the user
-        return False, f"qiskit-aer {version} is installed but a test simulation failed: {exc}"
-    detail = f" (test circuit ran, counts={counts})" if verbose else " (test simulation passed)"
+    except Exception as exc:  # noqa: BLE001 - report failure to user
+        msg = (
+            f"qiskit-aer {version} is installed but a test "
+            f"simulation failed: {exc}"
+        )
+        return False, msg
+    if verbose:
+        detail = f" (test circuit ran, counts={counts})"
+    else:
+        detail = " (test simulation passed)"
     return True, f"qiskit-aer {version}{detail}"
 
 
@@ -181,10 +201,15 @@ def build_parser() -> argparse.ArgumentParser:
         The configured argument parser.
     """
     parser = argparse.ArgumentParser(
-        description="Check that this environment has everything needed for the course."
+        description=(
+            "Check that this environment has everything needed for the course."
+        )
     )
     parser.add_argument(
-        "-v", "--verbose", action="store_true", help="Print extra detail for each check."
+        "-v",
+        "--verbose",
+        action="store_true",
+        help="Print extra detail for each check.",
     )
     return parser
 
@@ -206,7 +231,9 @@ def main() -> int:
         check_python(),
         check_min_version("qiskit", MIN_VERSIONS["qiskit"]),
         check_visualization_extras(args.verbose),
-        check_min_version("qiskit-ibm-runtime", MIN_VERSIONS["qiskit-ibm-runtime"]),
+        check_min_version(
+            "qiskit-ibm-runtime", MIN_VERSIONS["qiskit-ibm-runtime"]
+        ),
         check_aer(args.verbose),
         check_min_version("numpy", MIN_VERSIONS["numpy"]),
         check_min_version("scipy", MIN_VERSIONS["scipy"]),
@@ -227,11 +254,12 @@ def main() -> int:
             "If you're using uv (the recommended setup): re-run `uv sync` "
             "from the repo root, then try this script again."
         )
+        qiskit_ver = MIN_VERSIONS["qiskit"]
+        runtime_ver = MIN_VERSIONS["qiskit-ibm-runtime"]
         print(
-            'If you installed with plain pip/conda instead: try `pip install -U '
-            '"qiskit[visualization]>={}" "qiskit-ibm-runtime>={}" qiskit-aer`'.format(
-                MIN_VERSIONS["qiskit"], MIN_VERSIONS["qiskit-ibm-runtime"]
-            )
+            "If you installed with plain pip/conda instead: try:\n"
+            f'  pip install -U "qiskit[visualization]>={qiskit_ver}" '
+            f'"qiskit-ibm-runtime>={runtime_ver}" qiskit-aer'
         )
         return 1
 

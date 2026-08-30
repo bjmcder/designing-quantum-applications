@@ -45,7 +45,7 @@ def load_token_from_file(path: str) -> str:
     Raises
     ------
     SystemExit
-        If the file is not found, is invalid JSON, or does not contain an API key.
+        If file is not found, is invalid JSON, or does not contain a key.
     """
     file_path = Path(path)
     try:
@@ -88,10 +88,12 @@ def list_available_instances(token: str, channel: str) -> list[dict]:
         If the instances can't be listed with the given token.
     """
     try:
-        probe = QiskitRuntimeService(channel=channel, token=token, instance="auto")
+        probe = QiskitRuntimeService(
+            channel=channel, token=token, instance="auto"
+        )
         return probe.instances()
-    except Exception as exc:  # noqa: BLE001 - report any connection failure to the user
-        sys.exit(f"error: couldn't verify instances with this token: {exc}")
+    except Exception as exc:  # noqa: BLE001 - report connection failure
+        sys.exit(f"error: couldn't verify instances with token: {exc}")
 
 
 def resolve_instance_crn(token: str, channel: str, instance: str) -> str:
@@ -112,7 +114,7 @@ def resolve_instance_crn(token: str, channel: str, instance: str) -> str:
     channel : str
         The account channel (e.g., "ibm_quantum_platform" or "ibm_cloud").
     instance : str
-        The instance identifier; either a CRN (starting with "crn:") or a display name.
+        The instance identifier: a CRN (starting with "crn:") or a name.
 
     Returns
     -------
@@ -122,7 +124,7 @@ def resolve_instance_crn(token: str, channel: str, instance: str) -> str:
     Raises
     ------
     SystemExit
-        If the instance name cannot be resolved or is not accessible with the given token.
+        If the instance cannot be resolved or is inaccessible.
     """
     if instance.startswith("crn:"):
         return instance
@@ -131,7 +133,9 @@ def resolve_instance_crn(token: str, channel: str, instance: str) -> str:
 
     matches = [inst for inst in available if inst.get("name") == instance]
     if not matches:
-        names = ", ".join(inst.get("name") for inst in available) or "(none found)"
+        names = (
+            ", ".join(inst.get("name") for inst in available) or "(none found)"
+        )
         sys.exit(
             f"error: no instance named '{instance}' is accessible with this "
             f"token. Available instances: {names}"
@@ -148,26 +152,26 @@ def resolve_instance_crn(token: str, channel: str, instance: str) -> str:
 
 
 def auto_select_onprem_instance(token: str, channel: str) -> str | None:
-    """Automatically pick the on-prem instance used for this course.
+    """Automatically pick the on-prem instance for this course.
 
-    Called when the user doesn't pass --instance explicitly. Without an
-    instance set, IBM prioritizes free/trial plan instances over the
-    on-prem instance dedicated to this course, so look it up instead of
-    leaving the default to chance.
+    Called when the user doesn't pass --instance. Without an instance set,
+    IBM prioritizes free/trial plans over the on-prem instance dedicated to
+    this course, so look it up to avoid landing on the wrong one.
 
     Parameters
     ----------
     token : str
         The IBM Quantum API token.
     channel : str
-        The account channel (e.g., "ibm_quantum_platform" or "ibm_cloud").
+        The account channel (e.g., "ibm_quantum_platform" or
+        "ibm_cloud").
 
     Returns
     -------
     str or None
-        The CRN of the on-prem instance, or None if none (or more than one)
-        is accessible with this token -- a warning is printed in that case
-        and the caller should fall back to leaving no default instance set.
+        The CRN of the on-prem instance, or None if zero or multiple
+        on-prem instances are accessible. A warning is printed in that
+        case and the caller should leave no default instance set.
     """
     available = list_available_instances(token, channel)
     onprem = [inst for inst in available if inst.get("plan") == "on-prem"]
@@ -184,12 +188,13 @@ def auto_select_onprem_instance(token: str, channel: str) -> str | None:
         names = ", ".join(inst.get("name") for inst in onprem)
         print(
             f"warning: multiple on-prem instances are accessible ({names}); "
-            "leaving no default instance set. Pick one explicitly with --instance."
+            "leaving no default instance set. Use --instance to pick one."
         )
         return None
 
     inst = onprem[0]
-    print(f"Auto-selected on-prem instance '{inst.get('name')}' for this course.")
+    name = inst.get("name")
+    print(f"Auto-selected on-prem instance '{name}' for this course.")
     return inst["crn"]
 
 
@@ -286,9 +291,11 @@ def main() -> int:
     if args.from_file:
         token = load_token_from_file(args.from_file)
     else:
-        token = args.token or getpass.getpass("Enter your IBM Quantum API token: ")
+        prompt = "Enter your IBM Quantum API token: "
+        token = args.token or getpass.getpass(prompt)
     if not token:
-        parser.error("a token is required (pass --token or enter it at the prompt)")
+        msg = "a token is required (pass --token or enter at prompt)"
+        parser.error(msg)
 
     instance = args.instance
     if instance:
@@ -305,8 +312,10 @@ def main() -> int:
         set_as_default=args.set_as_default or None,
     )
     print(f"Account saved as '{args.name}'.")
-    print(f"Run 03_check_token.py --name {args.name} to verify it and see "
-          "which instance is selected.")
+    print(
+        f"Run 03_check_token.py --name {args.name} to verify it and see "
+        "which instance is selected."
+    )
 
     return 0
 
