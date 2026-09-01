@@ -42,6 +42,7 @@ logging.getLogger("qiskit_runtime_service").setLevel(logging.ERROR)
 
 DEFAULT_SHOTS = 10000
 DEFAULT_BACKEND = "ibm_rensselaer"
+PREFERRED_INSTANCE = "MANE-4960-dedicated"
 
 
 def build_bell_circuit() -> QuantumCircuit:
@@ -127,6 +128,7 @@ def run_on_hardware(
     shots: int,
     backend_name: str,
     account_name: str,
+    preferred_instance: str = PREFERRED_INSTANCE,
     poll_interval: int = DEFAULT_POLL_INTERVAL,
 ) -> dict | None:
     """Run a quantum circuit on IBM hardware via Qiskit Runtime.
@@ -144,6 +146,8 @@ def run_on_hardware(
         Name of the IBM backend (e.g., "ibm_rensselaer").
     account_name : str
         Name of the saved IBM Quantum account.
+    preferred_instance : str, optional
+        Instance name to warn about if not active (default: PREFERRED_INSTANCE).
     poll_interval : int, optional
         Seconds between status checks (default: DEFAULT_POLL_INTERVAL).
 
@@ -173,6 +177,26 @@ def run_on_hardware(
         return None
 
     print(f"Connected to {backend.name} ({backend.num_qubits} qubits)")
+
+    # Warn (don't block) if not on the preferred priority-queue instance.
+    # Using a different instance just means longer wait times.
+    # active_account()["instance"] is a CRN, not a friendly name, so look up
+    # the matching name from the account's list of available instances.
+    active_crn = service.active_account()["instance"]
+    active_instance = next(
+        (inst["name"] for inst in service.instances() if inst["crn"] == active_crn),
+        active_crn,
+    )
+    if active_instance != preferred_instance:
+        print(
+            f"** Note **  You're using instance '{active_instance}', not the "
+            f"preferred instance '{preferred_instance}'. Your job may "
+            "wait longer in the queue than necessary.\n"
+            "To switch instances:\n"
+            "  1. Run: uv run 02_save_token.py\n"
+            f"  2. When prompted, select '{preferred_instance}'\n"
+            "  3. Re-run this script"
+        )
 
     # Extra step, only needed for real hardware: convert to an ISA
     # (Instruction Set Architecture) circuit that is transpiled into this
