@@ -20,6 +20,11 @@ Estimator (let Qiskit do it)
     shots: it returns the exact value plus random noise of size --precision,
     and "std" simply repeats that precision.)
 
+    Hardware caveat: by default IBM's Estimator applies some error mitigation
+    (typically readout-error mitigation) on the server, and the Sampler applies
+    none. So on hardware the Estimator can look more accurate than raw Sampler
+    counts for that reason, not just because of how it measures.
+
 The experiment: the state Ry(theta)|0> = cos(theta/2)|0> + sin(theta/2)|1>,
 which has <Z> = cos(theta) and <X> = sin(theta). The observable is
 O = Z + X, so <O> = cos(theta) + sin(theta). We sweep theta in a single PUB

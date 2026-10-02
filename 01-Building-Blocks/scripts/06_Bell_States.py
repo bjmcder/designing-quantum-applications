@@ -181,6 +181,10 @@ def main() -> int:
             print(f"  {'':5s} X: {dict(sorted(x.items()))}")
 
         # ================= Estimator: correlators ==========================
+        # Note: on hardware, IBM's Estimator applies some error mitigation by
+        # default (typically readout-error mitigation) and the Sampler applies
+        # none, so the correlators below can look cleaner than the raw counts
+        # above for that reason.
         # STEP 2 again: transpile the *unmeasured* circuits. The Estimator
         # adds whatever basis changes and measurements it needs by itself.
         estimator_pubs = []
