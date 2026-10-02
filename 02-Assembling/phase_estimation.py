@@ -25,8 +25,11 @@ followed by an inverse quantum Fourier transform (QFT).
 4. Measure the counting qubits and divide by 2^t to get theta.
 
 If 2^t * theta is a whole number, the answer is exact and every shot agrees.
-Otherwise the counts peak at the nearest whole numbers, with a smaller tail
-that shrinks as t grows.
+Otherwise the counts peak at the whole number nearest 2^t * theta (it always
+has probability at least 4/pi^2, about 41%), with a tail on the other values.
+More counting qubits make the estimate finer (the spacing is 1/2^t), but they
+do not by themselves make the peak taller. That depends on how close
+2^t * theta is to a whole number.
 
 Circuit (t counting qubits, 1 target qubit):
 
@@ -52,13 +55,6 @@ import sys
 from _common import make_parser, run_experiments
 from qiskit import ClassicalRegister, QuantumCircuit, QuantumRegister
 from qiskit.circuit.library import QFTGate
-
-
-def _inverse_qft(t: int) -> QuantumCircuit:
-    """Return the inverse QFT on ``t`` qubits as basic H, CP, and SWAP gates."""
-    iqft = QuantumCircuit(t, name="IQFT")
-    iqft.append(QFTGate(t).inverse(), range(t))
-    return iqft.decompose(reps=1)
 
 
 def build_qpe_circuit(t: int, theta: float) -> QuantumCircuit:
@@ -91,10 +87,9 @@ def build_qpe_circuit(t: int, theta: float) -> QuantumCircuit:
         circuit.cp(2 * math.pi * theta * 2**k, counting[k], target[0])
     circuit.barrier()
 
-    # Step 3: inverse QFT. It is decomposed into basic gates because the
-    # Aer simulator doesn't accept the QFT as a single block.
-    iqft = _inverse_qft(t)
-    circuit.compose(iqft, qubits=counting, inplace=True)
+    # Step 3: inverse QFT. It is one high-level gate here; the transpiler
+    # breaks it into basic gates (H, controlled-phase, SWAP) when it runs.
+    circuit.append(QFTGate(t).inverse(), counting)
 
     # Step 4: measure the counting qubits.
     circuit.measure(counting, bits)

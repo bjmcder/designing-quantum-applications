@@ -131,10 +131,12 @@ def optimal_iterations(n: int, num_marked: int) -> int:
     Returns
     -------
     int
-        The best iteration count, at least 1.
+        The best iteration count. It is 0 when more than about half the items
+        are marked, because the starting superposition then already beats any
+        number of Grover iterations.
     """
     theta = math.asin(math.sqrt(num_marked / 2**n))
-    return max(1, round(math.pi / (4 * theta) - 0.5))
+    return max(0, round(math.pi / (4 * theta) - 0.5))
 
 
 def build_grover_circuit(n: int, marked: list[int], iterations: int) -> QuantumCircuit:

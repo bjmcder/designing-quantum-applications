@@ -17,8 +17,9 @@ same state. By linearity, the controlled-U gives
 The target is unchanged, but the phase e^(i*phi) now sits on the |1> part of
 the control. The phase has "kicked back" onto the control qubit.
 
-This is the engine behind Deutsch-Jozsa, Bernstein-Vazirani, Simon, Grover,
-and phase estimation, so it is worth seeing on its own.
+This is the engine behind Deutsch-Jozsa, Bernstein-Vazirani, and phase
+estimation. It is also the usual way to turn a bit oracle into a phase oracle
+for Grover's algorithm. It is worth seeing on its own.
 
 How we measure it
 -----------------

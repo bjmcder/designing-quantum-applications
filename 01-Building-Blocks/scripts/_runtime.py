@@ -83,8 +83,9 @@ class Target:
         Returns
         -------
         PrimitiveResult or None
-            One entry per PUB you submitted, in order. None if the wait was
-            interrupted; the job keeps running on IBM's servers.
+            One entry per PUB you submitted, in order. None if you stopped
+            waiting or the job failed. Callers should skip any later steps
+            that depend on it.
         """
         if not self.hardware:
             return job.result()
@@ -97,13 +98,25 @@ class Target:
         print(f"  submitted job {job.job_id()} on {self.label}; waiting...")
         try:
             return wait_for_job(job, self.backend, poll_interval=self.poll_interval)
-        except (KeyboardInterrupt, Exception) as exc:  # noqa: BLE001
-            cause = (
-                "Canceled."
-                if isinstance(exc, KeyboardInterrupt)
-                else f"Lost connection: {exc}"
+        except KeyboardInterrupt:
+            print(
+                f"\nStopped waiting. Job {job.job_id()} is still running on "
+                "IBM's servers."
             )
-            print(f"\n{cause} Job {job.job_id()} is still running on IBM's servers.")
+            return None
+        except Exception as exc:  # noqa: BLE001
+            # Either the job itself failed, or we lost contact with IBM.
+            try:
+                status = str(job.status())
+            except Exception:  # noqa: BLE001
+                status = None
+            if status in ("ERROR", "CANCELLED"):
+                print(f"\nJob {job.job_id()} ended with status {status}: {exc}")
+            else:
+                print(
+                    f"\nLost connection: {exc}\nJob {job.job_id()} is probably "
+                    "still running on IBM's servers."
+                )
             return None
 
 
@@ -136,7 +149,9 @@ def make_parser(description: str) -> argparse.ArgumentParser:
         default=DEFAULT_PRECISION,
         help=(
             "Target standard error for Estimator jobs (default: "
-            f"{DEFAULT_PRECISION}). Smaller means more shots."
+            f"{DEFAULT_PRECISION}). On IBM hardware, smaller means more shots. "
+            "On Aer there are no shots: it returns the exact value plus random "
+            "noise of this size."
         ),
     )
     parser.add_argument(

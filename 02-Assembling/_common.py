@@ -13,7 +13,7 @@ Each algorithm script does two things:
 and, unless you skip it, on IBM hardware. The hardware steps are the same
 ones taught in ``00-Setup-Start-Here/04_test_quantum.py``: transpile, submit,
 save the job ID, wait, and read the counts. If a hardware run is interrupted,
-recover the job with ``05_retrieve_job.py``.
+recover the job with ``00-Setup-Start-Here/05_retrieve_job.py``.
 
 A note on reading results: Qiskit prints bitstrings with qubit 0 on the
 *right*. For example, the counts key ``"101"`` means qubit 2 = 1, qubit 1 = 0,
@@ -29,6 +29,7 @@ from pathlib import Path
 
 from qiskit import QuantumCircuit
 from qiskit.transpiler.preset_passmanagers import generate_preset_pass_manager
+from qiskit_aer import AerSimulator
 from qiskit_aer.primitives import SamplerV2 as AerSampler
 from qiskit_ibm_runtime import QiskitRuntimeService
 from qiskit_ibm_runtime import SamplerV2 as RuntimeSampler
@@ -116,7 +117,13 @@ def run_on_aer(circuit: QuantumCircuit, shots: int) -> dict:
     """
     # A PUB (Primitive Unified Bloc) is a tuple holding the circuit; ours has
     # no parameters, so the tuple has just one entry.
-    job = AerSampler().run([(circuit,)], shots=shots)
+    # Transpile for Aer the same way we do for hardware. The simulator accepts
+    # almost any gate, so little changes, but this lets us use high-level gates
+    # such as QFTGate without decomposing them by hand.
+    isa_circuit = generate_preset_pass_manager(
+        backend=AerSimulator(), optimization_level=1
+    ).run(circuit)
+    job = AerSampler().run([(isa_circuit,)], shots=shots)
     _, counts = extract_counts(job.result()[0])
     return counts
 
@@ -142,8 +149,8 @@ def connect(backend_name: str, account_name: str):
     except Exception as exc:  # noqa: BLE001 - report connection failure
         print(f"Could not reach backend '{backend_name}': {exc}")
         print(
-            "Check that 02_save_token.py has been run, and run "
-            "03_check_token.py to see which backends you have access to. "
+            "Check that 00-Setup-Start-Here/02_save_token.py has been run, and "
+            "run 03_check_token.py to see which backends you have access to. "
             "Pass a different backend with: --backend <name>"
         )
         return None
@@ -194,11 +201,12 @@ def run_on_hardware(
     dict or None
         Maps each measured bitstring to its count, or None if the wait was
         interrupted or the connection dropped. In that case the job keeps
-        running on IBM's servers and can be fetched with 05_retrieve_job.py.
+        running on IBM's servers and can be fetched with 00-Setup-Start-Here/05_retrieve_job.py.
     """
     # Real hardware only understands its own basis gates and qubit layout, so
     # convert the circuit to an ISA (Instruction Set Architecture) circuit.
-    # The simulator didn't need this step.
+    # (run_on_aer does the same for Aer, but the simulator accepts almost any
+    # gate, so little changes there.)
     isa_circuit = generate_preset_pass_manager(
         backend=backend, optimization_level=1
     ).run(circuit)
@@ -212,20 +220,31 @@ def run_on_hardware(
     # keeps running on IBM's servers even if this script loses its connection.
     save_last_job(job.job_id(), backend.name, account_name)
     print(f"Submitted job {job.job_id()} on {backend.name}.")
-    print("If interrupted, retrieve it later with: uv run 05_retrieve_job.py")
+    print("If interrupted, retrieve it later with: uv run ../00-Setup-Start-Here/05_retrieve_job.py")
 
     try:
         result = wait_for_job(job, backend, poll_interval=poll_interval)
-    except (KeyboardInterrupt, Exception) as exc:  # noqa: BLE001
-        cause = (
-            "Cancelled."
-            if isinstance(exc, KeyboardInterrupt)
-            else f"Lost connection: {exc}"
-        )
+    except KeyboardInterrupt:
         print(
-            f"\n{cause} Job {job.job_id()} is still running on IBM's servers; "
-            f"fetch it with: uv run 05_retrieve_job.py {job.job_id()}"
+            f"\nStopped waiting. Job {job.job_id()} is still running on IBM's "
+            "servers; fetch it with: uv run "
+            f"../00-Setup-Start-Here/05_retrieve_job.py {job.job_id()}"
         )
+        return None
+    except Exception as exc:  # noqa: BLE001
+        # Either the job itself failed, or we lost contact with IBM.
+        try:
+            status = str(job.status())
+        except Exception:  # noqa: BLE001
+            status = None
+        if status in ("ERROR", "CANCELLED"):
+            print(f"\nJob {job.job_id()} ended with status {status}: {exc}")
+        else:
+            print(
+                f"\nLost connection: {exc}\nJob {job.job_id()} is probably "
+                "still running on IBM's servers; fetch it with: uv run "
+                f"../00-Setup-Start-Here/05_retrieve_job.py {job.job_id()}"
+            )
         return None
 
     _, counts = extract_counts(result[0])

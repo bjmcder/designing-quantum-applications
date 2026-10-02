@@ -6,14 +6,20 @@ The four Bell states are the simplest maximally entangled two-qubit states:
     |Phi+> = (|00> + |11>) / sqrt(2)        |Phi-> = (|00> - |11>) / sqrt(2)
     |Psi+> = (|01> + |10>) / sqrt(2)        |Psi-> = (|01> - |10>) / sqrt(2)
 
-One circuit makes all four. Start from the basis state |a b>, then apply H on
-qubit 0 and CX (control 0, target 1):
+One circuit makes all four. Start with qubit 0 in state a and qubit 1 in state
+b (written (a, b), qubit 0 first), then apply H on qubit 0 and CX (control 0,
+target 1). The X gates that set a and b come first.
 
-    |00> -> Phi+     |10> -> Phi-     |01> -> Psi+     |11> -> Psi-
-    (the X gates that set a, b come first)
+    (a, b) = (0, 0) -> Phi+     (1, 0) -> Phi-
+    (a, b) = (0, 1) -> Psi+     (1, 1) -> Psi-   (up to a global phase)
+
+Careful: Qiskit prints bitstrings with qubit 0 on the RIGHT, so the input
+(a, b) = (1, 0) is the label "01" in Qiskit's counts. Below, a two-qubit state
+label such as |0+> follows the same Qiskit order: qubit 1 is |0>, qubit 0 is
+|+>.
 
 For comparison we also build three *unentangled* states, which can always be
-written as (one-qubit state) x (one-qubit state): |00>, |++> and |+0>.
+written as (one-qubit state) x (one-qubit state): |00>, |++> and |0+>.
 
 Telling them apart takes more than one measurement basis
 --------------------------------------------------------
@@ -26,7 +32,8 @@ Telling them apart takes more than one measurement basis
 Correlators with an Estimator
 -----------------------------
 Instead of counting bitstrings ourselves, an Estimator returns expectation
-values of observables directly. We ask for three correlators, each in [-1, 1]:
+values of observables directly. We ask for three correlators, each ideally
+in [-1, 1]:
 
                ZZ      XX      YY
     Phi+       +1      +1      -1
@@ -36,7 +43,9 @@ values of observables directly. We ask for three correlators, each in [-1, 1]:
     |++>        0      +1       0       (product states are much weaker)
 
 Entanglement witness: S = |<ZZ>| + |<XX>| + |<YY>|. For any product state
-S <= 1 (by the Cauchy-Schwarz inequality). Bell states have S = 3. Seeing
+S <= 1 (by the Cauchy-Schwarz inequality; by convexity this also holds for
+any mixture of product states, so noisy hardware can't fake it). Bell states
+have S = 3. Seeing
 S > 1 proves the two qubits are entangled.
 
 The steps
@@ -71,7 +80,7 @@ def build_state(name: str) -> QuantumCircuit:
     ----------
     name : str
         "Phi+", "Phi-", "Psi+", "Psi-" (entangled), or "|00>", "|++>",
-        "|+0>" (unentangled).
+        "|0+>" (unentangled).
 
     Returns
     -------
@@ -92,7 +101,7 @@ def build_state(name: str) -> QuantumCircuit:
     elif name == "|++>":
         circuit.h(qubits[0])
         circuit.h(qubits[1])
-    elif name == "|+0>":
+    elif name == "|0+>":
         circuit.h(qubits[0])
     elif name != "|00>":
         raise ValueError(f"Unknown state {name!r}")
@@ -130,7 +139,7 @@ def main() -> int:
     args = make_parser(__doc__).parse_args()
 
     # ---- STEP 1: circuits --------------------------------------------------
-    names = list(BELL_BITS) + ["|00>", "|++>", "|+0>"]
+    names = list(BELL_BITS) + ["|00>", "|++>", "|0+>"]
     states = {n: build_state(n) for n in names}
     banner("STEP 1 - Circuit for Phi+ (the X-basis version)")
     print(measured(states["Phi+"], "X").draw(output="text"))
@@ -161,14 +170,15 @@ def main() -> int:
         sampler_pubs = [(isa,) for isa in sampler_circuits.values()]
         print(f"Sampler: {len(sampler_pubs)} PUBs in one job")
         result = target.wait(target.sampler.run(sampler_pubs, shots=args.shots))
-        if result is not None:
-            # STEP 6: counts keyed by bitstring "q1 q0".
-            print(f"\nSampler counts ({args.shots} shots) -- Z basis | X basis")
-            for i, (name, _) in enumerate(states.items()):
-                z = result[2 * i].data.meas.get_counts()
-                x = result[2 * i + 1].data.meas.get_counts()
-                print(f"  {name:5s} Z: {dict(sorted(z.items()))}")
-                print(f"  {'':5s} X: {dict(sorted(x.items()))}")
+        if result is None:
+            continue  # don't submit the Estimator job if this one failed
+        # STEP 6: counts keyed by bitstring "q1 q0".
+        print(f"\nSampler counts ({args.shots} shots) -- Z basis | X basis")
+        for i, (name, _) in enumerate(states.items()):
+            z = result[2 * i].data.meas.get_counts()
+            x = result[2 * i + 1].data.meas.get_counts()
+            print(f"  {name:5s} Z: {dict(sorted(z.items()))}")
+            print(f"  {'':5s} X: {dict(sorted(x.items()))}")
 
         # ================= Estimator: correlators ==========================
         # STEP 2 again: transpile the *unmeasured* circuits. The Estimator
@@ -184,7 +194,10 @@ def main() -> int:
             # observables gives three expectation values from one PUB.
             estimator_pubs.append((isa, isa_observables))
         print(f"\nEstimator: {len(estimator_pubs)} PUBs in one job")
-        # STEP 5: precision is the target standard error on each value.
+        # STEP 5: precision is the target standard error on each value. On
+        # hardware it sets the number of shots. Aer has no shots: it returns
+        # the exact value plus random noise of this size, so a value can land
+        # slightly outside [-1, 1].
         result = target.wait(
             target.estimator.run(estimator_pubs, precision=args.precision)
         )
@@ -199,7 +212,7 @@ def main() -> int:
             ideal = Statevector(circuit)
             ideal_s = sum(abs(ideal.expectation_value(o).real) for o in observables)
             s = np.abs(ev).sum()
-            # Shot noise can push a product state slightly above 1, so only
+            # Noise can push a product state slightly above 1, so only
             # claim entanglement when S clears 1 by three standard errors.
             s_err = np.sqrt(np.sum(np.asarray(pub_result.data.stds) ** 2))
             verdict = "entangled" if s > 1 + 3 * s_err else "no entanglement shown"

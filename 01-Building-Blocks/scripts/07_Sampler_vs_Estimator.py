@@ -16,7 +16,9 @@ Sampler (do it yourself)
 Estimator (let Qiskit do it)
     Give it a circuit WITHOUT measurements and the observable. It picks the
     basis changes, runs the circuits, combines the terms, and returns the
-    expectation value together with its standard error.
+    expectation value together with its standard error. (On Aer there are no
+    shots: it returns the exact value plus random noise of size --precision,
+    and "std" simply repeats that precision.)
 
 The experiment: the state Ry(theta)|0> = cos(theta/2)|0> + sin(theta/2)|1>,
 which has <Z> = cos(theta) and <X> = sin(theta). The observable is
@@ -125,18 +127,18 @@ def main() -> int:
         sampler_pubs = [(isa_z, THETA_VALUES), (isa_x, THETA_VALUES)]
         # STEP 5
         result = target.wait(target.sampler.run(sampler_pubs, shots=args.shots))
-        by_hand = None
-        if result is not None:
-            # STEP 6: data.meas is a BitArray with one entry per theta value;
-            # get_counts(i) picks the i-th.
-            z_counts, x_counts = (r.data.meas for r in result)
-            by_hand = np.array(
-                [
-                    expectation_from_counts(z_counts.get_counts(i))
-                    + expectation_from_counts(x_counts.get_counts(i))
-                    for i in range(len(THETA_VALUES))
-                ]
-            )
+        if result is None:
+            continue  # don't submit the Estimator job if this one failed
+        # STEP 6: data.meas is a BitArray with one entry per theta value;
+        # get_counts(i) picks the i-th.
+        z_counts, x_counts = (r.data.meas for r in result)
+        by_hand = np.array(
+            [
+                expectation_from_counts(z_counts.get_counts(i))
+                + expectation_from_counts(x_counts.get_counts(i))
+                for i in range(len(THETA_VALUES))
+            ]
+        )
 
         # ================= Estimator: one circuit, one observable =========
         isa_state = pass_manager.run(state)  # no measurements!
