@@ -51,7 +51,14 @@ import sys
 
 from _common import make_parser, run_experiments
 from qiskit import ClassicalRegister, QuantumCircuit, QuantumRegister
-from qiskit.circuit.library import QFT
+from qiskit.circuit.library import QFTGate
+
+
+def _inverse_qft(t: int) -> QuantumCircuit:
+    """Return the inverse QFT on ``t`` qubits as basic H, CP, and SWAP gates."""
+    iqft = QuantumCircuit(t, name="IQFT")
+    iqft.append(QFTGate(t).inverse(), range(t))
+    return iqft.decompose(reps=1)
 
 
 def build_qpe_circuit(t: int, theta: float) -> QuantumCircuit:
@@ -86,7 +93,7 @@ def build_qpe_circuit(t: int, theta: float) -> QuantumCircuit:
 
     # Step 3: inverse QFT. It is decomposed into basic gates because the
     # Aer simulator doesn't accept the QFT as a single block.
-    iqft = QFT(t, inverse=True, do_swaps=True, name="IQFT").decompose(reps=2)
+    iqft = _inverse_qft(t)
     circuit.compose(iqft, qubits=counting, inplace=True)
 
     # Step 4: measure the counting qubits.
