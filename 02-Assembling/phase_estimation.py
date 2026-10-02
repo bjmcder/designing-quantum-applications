@@ -42,7 +42,10 @@ The unitary used here
 U = P(2*pi*theta), the phase gate that multiplies |1> by e^(2*pi*i*theta).
 The target is |1>, which is an eigenstate. Since U^(2^k) = P(2*pi*theta*2^k),
 each controlled-U^(2^k) is one controlled-phase gate, with no repeated
-applications needed.
+applications needed. That is special to a phase gate: U^(2^k) is just one gate
+with its angle multiplied by 2^k. For a general U, the cost of controlled-U^(2^k)
+grows exponentially in k (2^k repeated applications, unless a shortcut
+exists), and that cost is the main practical obstacle to QPE.
 
 Run with no arguments for theta = 5/16 and t = 4. Here 2^t * theta = 5, so
 the answer is exact and the outcome is always 0101. Try --theta 0.3 to see the

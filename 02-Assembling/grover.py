@@ -39,7 +39,12 @@ ones, the multi-controlled Z flips the sign of the all-ones state, and the X
 gates are then undone. The diffuser is this same gate for the state
 |00...0>, sandwiched between Hadamard layers.
 
-Run with no arguments for n = 3 and marked state 0b101. Pass --skip-hardware
+On hardware, the n = 3, k = 2 circuit is deep (about 37 two-qubit gates after transpiling for a fake IBM backend), so P(marked) will be noticeably lower than the ideal 0.945, and k = 1 may do better than k = 2.
+The
+ideal curve ignores noise, so hardware results show how errors accumulate with
+circuit depth.
+
+Run with no arguments for n = 3 and marked state 0b110. Pass --skip-hardware
 to run only the simulator.
 """
 
@@ -184,8 +189,8 @@ def main() -> int:
         "--marked",
         type=lambda s: int(s, 0),
         nargs="+",
-        default=[0b101],
-        help="Marked item(s), e.g. 0b101 (default: 0b101).",
+        default=[0b110],
+        help="Marked item(s), e.g. 0b110 (default: 0b110).",
     )
     parser.add_argument(
         "--iterations",

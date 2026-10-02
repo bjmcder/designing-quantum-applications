@@ -10,8 +10,9 @@ Sampler (do it yourself)
     expectation value from the counts. For O = Z, with n0 zeros and n1 ones,
     <Z> = (n0 - n1) / N. To measure X you must first change basis: since
     X = H Z H, apply H before measuring and then treat the result as Z.
-    An observable made of several non-commuting terms (here Z + X) needs one
-    circuit per term, and you add up the results.
+    An observable made of several terms (here Z + X) needs one circuit per
+    group of qubit-wise commuting terms (for example ZZ and ZI can share one
+    circuit); Z and X cannot. Run each circuit and add up the results.
 
 Estimator (let Qiskit do it)
     Give it a circuit WITHOUT measurements and the observable. It picks the
@@ -98,6 +99,19 @@ def expectation_from_counts(counts: dict[str, int]) -> float:
     return (n0 - n1) / (n0 + n1)
 
 
+def sampler_std(z_counts: dict[str, int], x_counts: dict[str, int]) -> float:
+    """Return the standard error of the by-hand <Z> + <X> estimate.
+
+    N shots of a +/-1 outcome with mean <P> have variance (1 - <P>^2) / N. The
+    Z and X runs are independent, so the variances add before the square root.
+    """
+    variance = 0.0
+    for counts in (z_counts, x_counts):
+        n = sum(counts.values())
+        variance += (1 - expectation_from_counts(counts) ** 2) / n
+    return float(np.sqrt(variance))
+
+
 def main() -> int:
     """Estimate <Z + X> over a sweep of theta, both ways."""
     args = make_parser(__doc__).parse_args()
@@ -144,6 +158,14 @@ def main() -> int:
                 for i in range(len(THETA_VALUES))
             ]
         )
+        # The Estimator's "std" on Aer only repeats the requested precision, so
+        # we also compute the Sampler's own standard error for a fair comparison.
+        by_hand_std = np.array(
+            [
+                sampler_std(z_counts.get_counts(i), x_counts.get_counts(i))
+                for i in range(len(THETA_VALUES))
+            ]
+        )
 
         # ================= Estimator: one circuit, one observable =========
         isa_state = pass_manager.run(state)  # no measurements!
@@ -163,15 +185,15 @@ def main() -> int:
             stds = np.asarray(result[0].data.stds)
 
         # ---- compare -----------------------------------------------------
-        print("\n  theta/pi   exact   Sampler (by hand)   Estimator (ev +/- std)")
+        print("\n  theta/pi   exact   Sampler (by hand +/- std)   Estimator (ev +/- std)")
         for i, theta in enumerate(THETA_VALUES[:, 0]):
-            s = f"{by_hand[i]:+.3f}" if by_hand is not None else "  n/a"
+            s = f"{by_hand[i]:+.3f} +/- {by_hand_std[i]:.3f}"
             e = (
                 f"{evs[i]:+.3f} +/- {stds[i]:.3f}"
                 if evs is not None
                 else "n/a"
             )
-            print(f"  {theta / np.pi:7.3f}  {exact[i]:+.3f}   {s:>17}   {e}")
+            print(f"  {theta / np.pi:7.3f}  {exact[i]:+.3f}   {s:>25}   {e}")
 
     print(
         "\nTakeaway: both recover cos(theta) + sin(theta). The Sampler needed us to "

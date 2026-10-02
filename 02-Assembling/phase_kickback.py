@@ -51,6 +51,11 @@ eigenstate with eigenvalue 1.
                       This special case is the one used in Deutsch-Jozsa and
                       Bernstein-Vazirani.
 
+Note that CP(phi) is symmetric in control and target, so "the phase lands on
+the control" is just a relabeling for that gate. The CX-on-|-> case is the
+more convincing demonstration: there the target stays |-> and the control
+flips.
+
 Run with no arguments. Pass --skip-hardware to run only the simulator.
 """
 

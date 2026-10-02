@@ -27,9 +27,10 @@ How it works
    strings y with y . s = 0 (mod 2), each equally likely.
 
 Every shot therefore gives one random y that is "orthogonal" to s, which is
-one linear equation on the bits of s. After about n different y values, s is
-the only nonzero string that fits them all. That last step is ordinary
-classical computing.
+one linear equation on the bits of s. Once you have n-1 linearly independent nonzero y's
+(typically a bit more than n shots in practice), s is the only nonzero string
+that fits them all. That last step is ordinary classical computing, and it
+is cheap: see the note on scaling below.
 
 Circuit (n input qubits, n output qubits):
 
@@ -40,7 +41,9 @@ The oracle used here
 --------------------
 Copy x into the output register (n CX gates). Then, if bit j of x is 1,
 where j is the lowest 1 bit of s, XOR s into the output. This makes
-f(x) = f(x XOR s), and f is 2-to-1.
+f(x) = f(x XOR s), and f is 2-to-1. (The CX from x_j onto output j repeats the
+copy and cancels it, so output bit j is always 0; the transpiler removes the
+pair.)
 
 Finding s from noisy data
 -------------------------
@@ -48,6 +51,13 @@ Hardware noise produces some y values that don't satisfy y . s = 0. Instead
 of solving the equations exactly, we try every nonzero candidate s and score
 it by the fraction of shots with y . s = 0. The true s scores about 1.0 and
 wrong candidates score about 0.5, so the best score wins even with noise.
+
+Caveat: this brute-force search tries all 2^n - 1 candidates, so this
+post-processing is exponential in n. We use it only because n is tiny here and
+because scoring tolerates hardware noise. The scalable method is Gaussian
+elimination over GF(2): solve y . s = 0 for n - 1 linearly independent y's,
+which costs about O(n^3). That is polynomial, so the quantum speedup is not
+undone. We do not implement it here.
 
 Run with no arguments for n = 3 and s = 0b110. Pass --skip-hardware to run
 only the simulator. This algorithm uses 2n qubits, so keep n small on
@@ -83,6 +93,9 @@ def build_oracle(n: int, secret: int) -> QuantumCircuit:
     for i in range(n):  # copy: |x>|0> -> |x>|x>
         oracle.cx(i, n + i)
     j = (secret & -secret).bit_length() - 1  # position of the lowest 1 bit of s
+    # When i == j this repeats the copy CX above, so the two cancel and output
+    # bit j is always 0. That is harmless (f is still 2-to-1), but the
+    # transpiler removes the pair, so the compiled circuit has fewer gates.
     for i in range(n):  # if x_j = 1, XOR s into the output
         if (secret >> i) & 1:
             oracle.cx(j, n + i)
@@ -131,6 +144,10 @@ def dot(a: int, b: int) -> int:
 
 def recover_secret(counts: dict, n: int) -> tuple[int, float]:
     """Find the hidden string that best fits the measured y values.
+
+    This brute-forces all 2^n - 1 candidates, which is exponential in n. It is
+    fine for tiny n and tolerates noise. At scale, use Gaussian elimination
+    over GF(2) (about O(n^3)) instead.
 
     Parameters
     ----------

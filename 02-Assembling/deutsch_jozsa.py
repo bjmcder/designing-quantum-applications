@@ -15,7 +15,9 @@ in the worst case. Deutsch-Jozsa answers with a single call.
 How it works
 ------------
 1. Hadamards put the n input qubits into an equal superposition of all 2^n
-   strings, so one oracle call touches every input at once.
+   strings, so one oracle call touches every input at once. (Measuring that state
+   right away would reveal only one random x. The advantage comes from the
+   interference in step 3.)
 2. The ancilla qubit starts in the state |->. With the ancilla in |->, the
    oracle's "XOR f(x) into the ancilla" becomes a phase of (-1)^f(x) on each
    input |x>. This trick is phase kickback (see phase_kickback.py).
@@ -39,7 +41,15 @@ Oracles built here
                 input qubit where s has a 1 (onto the ancilla), plus an X on
                 the ancilla if b = 1.
 
-Run with no arguments to test all three oracles with 3 qubits. Pass
+On a balanced oracle the output register equals the mask s exactly, not
+just "something nonzero". That is because this oracle is linear (a parity
+function), and Hadamards turn a parity phase pattern into the single state
+|s>. Parity functions are only a small subset of all balanced functions,
+but they preview Bernstein-Vazirani (see bernstein_vazirani.py).
+
+Run with no arguments to test all three oracles with 3 qubits (the default
+balanced mask is 0b011). Qiskit prints bitstrings with qubit 0 on the right,
+so that mask appears as 011. Pass
 --skip-hardware to run only the simulator.
 """
 
@@ -50,6 +60,7 @@ from qiskit import ClassicalRegister, QuantumCircuit, QuantumRegister
 
 DEFAULT_QUBITS = 3
 ORACLE_KINDS = ("constant0", "constant1", "balanced")
+DEFAULT_MASK = 0b011  # not a palindrome, so it checks the bit ordering
 
 
 def build_oracle(
@@ -68,7 +79,7 @@ def build_oracle(
         One of "constant0", "constant1", or "balanced".
     mask : int, optional
         For "balanced" only: the nonzero n-bit mask s that picks which input
-        bits are included in the parity (default: all of them).
+        bits are included in the parity (default: 0b011, cut down to n bits).
     flip : bool, optional
         For "balanced" only: also XOR the output with 1 (default: False).
 
@@ -84,7 +95,7 @@ def build_oracle(
     if kind == "constant1":
         oracle.x(n)
     elif kind == "balanced":
-        mask = (1 << n) - 1 if mask is None else mask
+        mask = DEFAULT_MASK & ((1 << n) - 1) if mask is None else mask
         if not 0 < mask < (1 << n):
             raise ValueError(f"mask must be a nonzero {n}-bit value, got {mask}")
         for i in range(n):
@@ -175,7 +186,7 @@ def main() -> int:
         type=lambda s: int(s, 0),
         default=None,
         help="Balanced oracle: nonzero bitmask choosing which input bits are "
-        "in the parity, e.g. 0b101 (default: all bits).",
+        "in the parity, e.g. 0b101 (default: 0b011).",
     )
     parser.add_argument(
         "--flip",
@@ -184,6 +195,8 @@ def main() -> int:
     )
     args = parser.parse_args()
     n = args.qubits
+    if args.mask is not None and not 0 < args.mask < (1 << n):
+        parser.error(f"--mask must be a nonzero {n}-bit value")
     kinds = ORACLE_KINDS if args.oracle == "all" else (args.oracle,)
 
     circuits = {

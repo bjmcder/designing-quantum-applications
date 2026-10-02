@@ -18,6 +18,12 @@ and phase only shows up through interference. Apply each gate twice:
 So one application of each gate looks identical, and two applications give
 opposite, deterministic answers. That is superposition plus interference.
 
+Which measurement WOULD tell one H from one SX? One in the Y basis. H|0> = |+>
+has <Y> = 0, so a Y measurement gives 50/50. SX|0> = |-i> has <Y> = -1, so it
+gives the same answer every time. To measure in the Y basis, change basis first
+(apply S-dagger, then H) and then do the usual Z measurement: |-i> is mapped to
+|1>, so SX always reads 1. Scripts 06 and 07 use this same change-of-basis trick.
+
 The steps (every script in this folder follows the same recipe)
 ---------------------------------------------------------------
     1. Circuit    build the abstract circuit.

@@ -31,7 +31,11 @@ Circuit (n input qubits, 1 ancilla):
     inputs  : |0>^n --H^n--[ oracle U_f ]--H^n--measure  -> s
     ancilla : |1>   --H----[            ]
 
-Run with no arguments to recover the secret 0b101 using 3 qubits. Pass
+s_0 belongs to qubit 0, which is the RIGHTMOST character of Qiskit bitstrings. So the
+secret 0b110 (s_0 = 0, s_1 = 1, s_2 = 1) is printed as 110. The default is not a
+palindrome, so getting it back exactly confirms the bit ordering.
+
+Run with no arguments to recover the secret 0b110 using 3 qubits. Pass
 --skip-hardware to run only the simulator.
 """
 
@@ -40,7 +44,7 @@ import sys
 from _common import make_parser, run_experiments
 from qiskit import ClassicalRegister, QuantumCircuit, QuantumRegister
 
-DEFAULT_SECRET = 0b101
+DEFAULT_SECRET = 0b110
 
 
 def build_oracle(n: int, secret: int) -> QuantumCircuit:
@@ -121,7 +125,7 @@ def main() -> int:
         "--secret",
         type=lambda s: int(s, 0),
         default=DEFAULT_SECRET,
-        help="Hidden string, e.g. 0b101 (default: 0b101).",
+        help="Hidden string, e.g. 0b101 (default: 0b110).",
     )
     args = parser.parse_args()
     n = args.qubits

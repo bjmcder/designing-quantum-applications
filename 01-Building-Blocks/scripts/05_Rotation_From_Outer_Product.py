@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Build a rotation gate from a starting state and a target state.
+"""Build a rotation gate from a starting state and a goal state.
 
-The goal: given any single-qubit state |psi> (start) and |phi> (target), find
+The goal: given any single-qubit state |psi> (start) and |phi> (goal), find
 a gate U with  U|psi> = |phi>.
 
 The outer-product recipe
@@ -15,6 +15,10 @@ add the same thing for the orthogonal pair:
 For a state |s> = (a, b), the orthogonal state is |s_perp> = (-conj(b), conj(a)).
 Then U is unitary, U|psi> = |phi>, and U|psi_perp> = |phi_perp>: it rotates
 the whole Bloch sphere so that psi lands on phi.
+
+U is not unique: following it with any extra rotation about the psi axis still
+maps psi to phi. The phase we give |phi_perp> decides which one we get, and
+this recipe is just one valid choice.
 
 A handy way to see it: let  P_s = |s><0| + |s_perp><1|  (a gate that prepares
 |s> from |0>). Then  U = P_phi P_psi^dagger: "undo psi, then prepare phi".
@@ -81,33 +85,33 @@ def prepare_matrix(state: np.ndarray) -> np.ndarray:
     return np.outer(state, [1, 0]) + np.outer(orthogonal(state), [0, 1])
 
 
-def rotation_matrix(start: np.ndarray, target: np.ndarray) -> np.ndarray:
-    """Return U = |target><start| + |target_perp><start_perp|.
+def rotation_matrix(start: np.ndarray, goal: np.ndarray) -> np.ndarray:
+    """Return U = |goal><start| + |goal_perp><start_perp|.
 
     Parameters
     ----------
     start : np.ndarray
         The state the gate should act on, shape (2,).
-    target : np.ndarray
+    goal : np.ndarray
         The state the gate should produce, shape (2,).
 
     Returns
     -------
     np.ndarray
-        A 2x2 unitary with U @ start == target.
+        A 2x2 unitary with U @ start == goal.
     """
-    return np.outer(target, start.conj()) + np.outer(
-        orthogonal(target), orthogonal(start).conj()
+    return np.outer(goal, start.conj()) + np.outer(
+        orthogonal(goal), orthogonal(start).conj()
     )
 
 
-def build_circuit(start: np.ndarray, target: np.ndarray, rotate: bool) -> QuantumCircuit:
-    """Build |0> -> start -> (U) -> target -> back to |0> -> measure.
+def build_circuit(start: np.ndarray, goal: np.ndarray, rotate: bool) -> QuantumCircuit:
+    """Build |0> -> start -> (U) -> goal -> back to |0> -> measure.
 
     Parameters
     ----------
-    start, target : np.ndarray
-        The starting and target states.
+    start, goal : np.ndarray
+        The starting and goal states.
     rotate : bool
         If False, skip U (the control experiment).
 
@@ -123,17 +127,17 @@ def build_circuit(start: np.ndarray, target: np.ndarray, rotate: bool) -> Quantu
     circuit.append(UnitaryGate(prepare_matrix(start), label="P_psi"), qubits)
     circuit.barrier()  # keep the transpiler from merging the pieces together
     if rotate:
-        circuit.append(UnitaryGate(rotation_matrix(start, target), label="U"), qubits)
+        circuit.append(UnitaryGate(rotation_matrix(start, goal), label="U"), qubits)
         circuit.barrier()
     circuit.append(
-        UnitaryGate(prepare_matrix(target).conj().T, label="P_phi^dag"), qubits
+        UnitaryGate(prepare_matrix(goal).conj().T, label="P_phi^dag"), qubits
     )
     circuit.measure(qubits, bits)
     return circuit
 
 
 def main() -> int:
-    """Check three start/target pairs on Aer and (optionally) IBM hardware."""
+    """Check three start/goal pairs on Aer and (optionally) IBM hardware."""
     args = make_parser(__doc__).parse_args()
 
     # ---- STEP 1: circuits --------------------------------------------------
@@ -148,14 +152,14 @@ def main() -> int:
     banner("The math (exact)")
     circuits = {}
     expected_p0 = {}
-    for case, (start, target) in cases.items():
-        u = rotation_matrix(start, target)
+    for case, (start, goal) in cases.items():
+        u = rotation_matrix(start, goal)
         is_unitary = np.allclose(u.conj().T @ u, np.eye(2))
-        maps_ok = np.allclose(u @ start, target)
-        overlap = abs(np.vdot(target, start)) ** 2
+        maps_ok = np.allclose(u @ start, goal)
+        overlap = abs(np.vdot(goal, start)) ** 2
         print(f"{case:12s} unitary: {is_unitary}   U|psi> == |phi>: {maps_ok}")
-        circuits[f"{case} with U"] = build_circuit(start, target, rotate=True)
-        circuits[f"{case} no U"] = build_circuit(start, target, rotate=False)
+        circuits[f"{case} with U"] = build_circuit(start, goal, rotate=True)
+        circuits[f"{case} no U"] = build_circuit(start, goal, rotate=False)
         expected_p0[f"{case} with U"] = 1.0
         expected_p0[f"{case} no U"] = overlap
 
