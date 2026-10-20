@@ -44,7 +44,7 @@ from qiskit_ibm_runtime import SamplerV2 as RuntimeSampler
 
 # The folder name "00-Setup-Start-Here" can't be imported as a package (it
 # contains hyphens), so add it to the import path and import the file directly.
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "00-Setup-Start-Here"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "00-Setup-Start-Here"))
 from _job_state import (
     DEFAULT_POLL_INTERVAL,
     extract_counts,
@@ -280,7 +280,7 @@ def run_on_hardware(
     )
     print(
         "If interrupted, retrieve it later with: "
-        "uv run ../00-Setup-Start-Here/05_retrieve_job.py"
+        "uv run ../../00-Setup-Start-Here/05_retrieve_job.py"
     )
 
     try:
@@ -289,7 +289,7 @@ def run_on_hardware(
         print(
             f"\nStopped waiting. Job {job.job_id()} is still running on IBM's "
             "servers; fetch it with: uv run "
-            f"../00-Setup-Start-Here/05_retrieve_job.py {job.job_id()}"
+            f"../../00-Setup-Start-Here/05_retrieve_job.py {job.job_id()}"
         )
         return None
     except Exception as exc:  # noqa: BLE001
@@ -304,7 +304,7 @@ def run_on_hardware(
             print(
                 f"\nLost connection: {exc}\nJob {job.job_id()} is probably "
                 "still running on IBM's servers; fetch it with: uv run "
-                f"../00-Setup-Start-Here/05_retrieve_job.py {job.job_id()}"
+                f"../../00-Setup-Start-Here/05_retrieve_job.py {job.job_id()}"
             )
         return None
 
