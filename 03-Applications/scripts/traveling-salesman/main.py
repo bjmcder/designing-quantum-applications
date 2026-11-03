@@ -1,6 +1,6 @@
 """Entry point for the traveling salesman example.
 
-    python optimization/main.py cities.json --backend=ibm_xxx
+    python traveling-salesman/main.py cities.json --backend=ibm_xxx
 
 The input is a JSON file with city names and a table of travel costs (see
 example_cities.json). The script runs QAOA to find a cheap tour that visits
