@@ -41,26 +41,47 @@ HF_OCCUPATION = (1, 0, 1, 0)  # sigma_g up and sigma_g down are filled
 
 
 def _boys0(t: np.ndarray) -> np.ndarray:
-    """F0(t) = integral of exp(-t u^2) from 0 to 1, with F0(0) = 1."""
+    """Boys function F0(t) = integral of exp(-t u^2) from 0 to 1, with F0(0) = 1.
+
+    Args:
+        t: Argument, a number or an array.
+
+    Returns:
+        F0(t), with the shape of ``t``.
+    """
     t = np.asarray(t, dtype=float)
     safe = np.where(t < 1e-12, 1.0, t)
     return np.where(t < 1e-12, 1.0, 0.5 * np.sqrt(np.pi / safe) * erf(np.sqrt(safe)))
 
 
 def _centers(distance: float) -> np.ndarray:
-    """Positions of the two nuclei (bohr) along the z axis."""
+    """Positions of the two nuclei on the z axis.
+
+    Args:
+        distance: Bond length in angstrom.
+
+    Returns:
+        A 2 x 3 array of positions in bohr.
+    """
     half = 0.5 * distance / BOHR
     return np.array([[0.0, 0.0, -half], [0.0, 0.0, half]])
 
 
 def atomic_integrals(distance: float):
-    """Overlap S, one-electron h and two-electron (ab|cd) in the 1s basis.
+    """Overlap, one-electron and two-electron integrals in the 1s basis.
 
     The basis is the two atomic orbitals phi_1, phi_2. Every integral is a sum
     over products of primitive Gaussians, each with a closed form for s-type
     functions (Szabo and Ostlund, appendix A). ``eri`` uses chemists'
     notation: (ab|cd) is the repulsion between the charge clouds
     phi_a phi_b and phi_c phi_d.
+
+    Args:
+        distance: Bond length in angstrom.
+
+    Returns:
+        (S, h, eri): the 2 x 2 overlap, the 2 x 2 one-electron integrals, and
+        the 2 x 2 x 2 x 2 two-electron integrals, in hartree.
     """
     centers = _centers(distance)
     weight = COEF * NORM  # coefficient times normalization of each primitive
@@ -69,7 +90,11 @@ def atomic_integrals(distance: float):
     eri = np.zeros((n, n, n, n))
 
     def gaussian_product(a, b, ca, cb):
-        # exp(-a|r-ca|^2) exp(-b|r-cb|^2) = K exp(-p|r-P|^2)
+        """Gaussian product theorem for two s-type primitives.
+
+        exp(-a|r-ca|^2) exp(-b|r-cb|^2) = K exp(-p|r-P|^2). Returns (p, mu, P, K)
+        with mu = a b / p.
+        """
         p = a + b
         mu = a * b / p
         P = (a * ca + b * cb) / p
@@ -111,7 +136,13 @@ def molecular_integrals(distance: float):
     By symmetry the orbitals are fixed without any iteration:
     sigma_g = (phi_1 + phi_2) / sqrt(2 + 2 S12) and
     sigma_u = (phi_1 - phi_2) / sqrt(2 - 2 S12).
-    Returns (h, eri, e_nuc) with h[p, q] and eri[p, q, r, s] = (pq|rs).
+
+    Args:
+        distance: Bond length in angstrom.
+
+    Returns:
+        (h, eri, e_nuc): h[p, q], eri[p, q, r, s] = (pq|rs) over the orbitals
+        sigma_g and sigma_u, and the nuclear repulsion 1/R, in hartree.
     """
     S, h_ao, eri_ao = atomic_integrals(distance)
     C = np.array([[1, 1], [1, -1]]) / np.sqrt(2 + 2 * np.array([S[0, 1], -S[0, 1]]))
@@ -124,7 +155,16 @@ def molecular_integrals(distance: float):
 
 
 def _annihilation(j: int) -> np.ndarray:
-    """a_j on the 16-dim Fock space (Jordan-Wigner signs)."""
+    """Annihilation operator a_j on the 16-dimensional Fock space.
+
+    The Jordan-Wigner signs make the a_j anticommute.
+
+    Args:
+        j: Spin-orbital index, 0 to 3.
+
+    Returns:
+        A 16 x 16 matrix.
+    """
     n = N_SPIN_ORBITALS
     label = ["I"] * n
     label[j] = "X"
@@ -140,17 +180,38 @@ def _annihilation(j: int) -> np.ndarray:
 
 
 def orbital(so: int) -> int:
-    """Spatial orbital (0 = sigma_g, 1 = sigma_u) of a spin orbital."""
+    """Spatial orbital of a spin orbital.
+
+    Args:
+        so: Spin-orbital index, 0 to 3.
+
+    Returns:
+        0 for sigma_g, 1 for sigma_u.
+    """
     return so % 2
 
 
 def spin(so: int) -> int:
-    """Spin (0 = up, 1 = down) of a spin orbital."""
+    """Spin of a spin orbital.
+
+    Args:
+        so: Spin-orbital index, 0 to 3.
+
+    Returns:
+        0 for spin up, 1 for spin down.
+    """
     return so // 2
 
 
 def fock_hamiltonian(distance: float) -> np.ndarray:
-    """Molecular Hamiltonian on the 16-dim Fock space, in hartree."""
+    """Molecular Hamiltonian on the 16-dimensional Fock space.
+
+    Args:
+        distance: Bond length in angstrom.
+
+    Returns:
+        A 16 x 16 complex matrix in hartree.
+    """
     h, eri, e_nuc = molecular_integrals(distance)
     a = [_annihilation(j) for j in range(N_SPIN_ORBITALS)]
     ad = [x.conj().T for x in a]
@@ -171,6 +232,9 @@ def excitation_generators() -> dict[str, np.ndarray]:
 
     exp(theta G) moves amplitude from the Hartree-Fock determinant to the
     excited one. Singles move one electron g -> u, the double moves both.
+
+    Returns:
+        16 x 16 matrices keyed "single_up", "single_down" and "double".
     """
     a = [_annihilation(j) for j in range(N_SPIN_ORBITALS)]
     ad = [x.conj().T for x in a]
@@ -188,19 +252,37 @@ def excitation_generators() -> dict[str, np.ndarray]:
 
 
 def _bits(i: int) -> list[int]:
+    """Occupation numbers of a Fock basis state.
+
+    Args:
+        i: Basis-state index, 0 to 15.
+
+    Returns:
+        Four occupation numbers, spin orbital 0 first.
+    """
     return [(i >> k) & 1 for k in range(N_SPIN_ORBITALS)]
 
 
 def encode(occupation, mapping: str) -> list[int]:
-    """Qubit bits (qubit 0 first) that store the occupations n_0..n_3.
+    """Qubit bits that store the occupations n_0..n_3.
 
     jw:     qubit k holds n_k.
     parity: qubit k holds n_0 + ... + n_k (mod 2).
     bk:     Bravyi-Kitaev, qubit k holds the sum of a block of occupations
             ending at k whose length is the lowest set bit of k + 1.
+
+    Args:
+        occupation: Occupation numbers n_0..n_3.
+        mapping: Qubit mapping, one of ``MAPPINGS``.
+
+    Returns:
+        Four bits, qubit 0 first.
+
+    Raises:
+        ValueError: If the mapping is unknown.
     """
     n = list(occupation)
-    if mapping in ("jw",):
+    if mapping == "jw":
         return n
     if mapping in ("parity", "parity2"):
         return [sum(n[: k + 1]) % 2 for k in range(len(n))]
@@ -214,6 +296,14 @@ def encode(occupation, mapping: str) -> list[int]:
 
 
 def _index(bits) -> int:
+    """Basis-state index of a list of bits.
+
+    Args:
+        bits: Bits with bit 0 first, the least significant.
+
+    Returns:
+        The index.
+    """
     return sum(b << k for k, b in enumerate(bits))
 
 
@@ -226,8 +316,15 @@ def to_mapping(matrix: np.ndarray, mapping: str) -> np.ndarray:
 
     ``parity2`` also removes two qubits. In the parity mapping qubit 1 stores
     the parity of the spin-up electrons and qubit 3 the parity of all of them.
-    Both are conserved, and for H2 (one up and one down electron) they are
-    always 1 and 0. We keep only that block, which leaves qubits 0 and 2.
+    Both are conserved, and for H2, with one up and one down electron, they
+    are always 1 and 0. We keep only that block, which leaves qubits 0 and 2.
+
+    Args:
+        matrix: 16 x 16 operator on the Fock space.
+        mapping: Qubit mapping, one of ``MAPPINGS``.
+
+    Returns:
+        The matrix in the mapping's basis, 4 x 4 for ``parity2``.
     """
     new = np.array([_index(encode(_bits(i), mapping)) for i in range(16)])
     out = np.zeros_like(matrix)
@@ -239,13 +336,28 @@ def to_mapping(matrix: np.ndarray, mapping: str) -> np.ndarray:
 
 
 def to_pauli(matrix: np.ndarray, mapping: str) -> SparsePauliOp:
-    """Pauli decomposition of ``to_mapping(matrix, mapping)``."""
+    """Pauli decomposition of a Fock-space operator in a qubit mapping.
+
+    Args:
+        matrix: 16 x 16 operator on the Fock space.
+        mapping: Qubit mapping, one of ``MAPPINGS``.
+
+    Returns:
+        The operator as a sum of Pauli strings.
+    """
     op = SparsePauliOp.from_operator(Operator(to_mapping(matrix, mapping)))
     return op.simplify(atol=1e-10)
 
 
 def hf_bits(mapping: str) -> str:
-    """Hartree-Fock reference as a bitstring in Qiskit order (qubit 0 last)."""
+    """Bitstring of the Hartree-Fock state, in Qiskit order with qubit 0 last.
+
+    Args:
+        mapping: Qubit mapping, one of ``MAPPINGS``.
+
+    Returns:
+        One character per qubit.
+    """
     bits = encode(HF_OCCUPATION, mapping)
     if mapping == "parity2":
         bits = [bits[0], bits[2]]
@@ -253,25 +365,47 @@ def hf_bits(mapping: str) -> str:
 
 
 def n_qubits(mapping: str) -> int:
+    """Number of qubits a mapping needs.
+
+    Args:
+        mapping: Qubit mapping, one of ``MAPPINGS``.
+
+    Returns:
+        2 for ``parity2``, otherwise 4.
+    """
     return 2 if mapping == "parity2" else N_SPIN_ORBITALS
 
 
 def build_hamiltonian(distance: float, mapping: str) -> SparsePauliOp:
-    """Qubit Hamiltonian of H2 at bond length ``distance`` (angstrom)."""
+    """Qubit Hamiltonian of H2.
+
+    Args:
+        distance: Bond length in angstrom.
+        mapping: Qubit mapping, one of ``MAPPINGS``.
+
+    Returns:
+        The Hamiltonian in hartree as a sum of Pauli strings.
+    """
     return to_pauli(fock_hamiltonian(distance), mapping)
 
 
 def exact_energies(distance: float) -> dict[str, float]:
     """Reference energies from the 16 x 16 matrix.
 
-    fci:      lowest energy with one up and one down electron (the answer).
-    hf:       energy of the Hartree-Fock determinant.
-    fock_min: lowest energy over every electron number, which is what an
-              ansatz that ignores particle number can fall into.
+    Args:
+        distance: Bond length in angstrom.
+
+    Returns:
+        Energies in hartree, keyed by
+
+        fci:      lowest energy with one up and one down electron, the answer.
+        hf:       energy of the Hartree-Fock determinant.
+        fock_min: lowest energy over every electron number, which is what an
+                  ansatz that ignores particle number can fall into.
     """
     H = fock_hamiltonian(distance)
     reduced = to_mapping(H, "parity2").real
-    hf = _index([HF_OCCUPATION[k] for k in range(4)])
+    hf = _index(HF_OCCUPATION)
     return {
         "fci": float(np.linalg.eigvalsh(reduced)[0]),
         "hf": float(H[hf, hf].real),

@@ -37,7 +37,15 @@ LABELS = {
 
 
 def ref_state(n_states: int, mapping: str) -> QuantumCircuit:
-    """Circuit that prepares oscillator state |0> in this mapping."""
+    """Circuit that prepares oscillator state |0> in a qubit mapping.
+
+    Args:
+        n_states: Number of oscillator states.
+        mapping: Qubit mapping, one of ``ops.MAPPINGS``.
+
+    Returns:
+        The state-preparation circuit, which has no angles.
+    """
     bits = ref_bits(n_states, mapping)  # qubit 0 is the rightmost character
     circuit = QuantumCircuit(n_qubits(n_states, mapping), name="ref")
     for qubit, bit in enumerate(reversed(bits)):
@@ -49,9 +57,19 @@ def ref_state(n_states: int, mapping: str) -> QuantumCircuit:
 def build_ansatz(
     name: str, n_states: int, mapping: str, reps: int = 2
 ) -> QuantumCircuit:
-    """Parameterized circuit for ``name`` in the qubit ``mapping``.
+    """Parameterized circuit for one ansatz in one qubit mapping.
 
-    ``reps`` only applies to the hardware-efficient ansatzes.
+    Args:
+        name: Ansatz, one of ``ANSATZES``.
+        n_states: Number of oscillator states.
+        mapping: Qubit mapping, one of ``ops.MAPPINGS``.
+        reps: Layers of the hardware-efficient ansatzes. Ignored by the others.
+
+    Returns:
+        The ansatz with symbolic angles.
+
+    Raises:
+        ValueError: If the ansatz is unknown.
     """
     if name not in ANSATZES:
         raise ValueError(f"unknown ansatz {name!r}; choose from {ANSATZES}")
@@ -86,6 +104,14 @@ def initial_point(name: str, n_params: int, rng: np.random.Generator):
     Rotation angles are small mixings away from |0>, so we start close to it.
     Hardware-efficient angles have no such meaning, so any angle is as good
     as any other.
+
+    Args:
+        name: Ansatz name.
+        n_params: Number of angles.
+        rng: Random number generator.
+
+    Returns:
+        The starting angles in radians.
     """
     if name == "rot":
         return rng.normal(0, 0.1, n_params)
@@ -93,10 +119,16 @@ def initial_point(name: str, n_params: int, rng: np.random.Generator):
 
 
 def circuit_cost(circuit: QuantumCircuit) -> tuple[int, int]:
-    """(depth, two-qubit gates) after compiling to {RZ, SX, X, CX}.
+    """Depth and two-qubit gate count after compiling to {RZ, SX, X, CX}.
 
     A fixed gate set makes the numbers comparable between ansatzes. It is not
     the cost on any one device, which also depends on its connectivity.
+
+    Args:
+        circuit: The ansatz.
+
+    Returns:
+        (depth, two-qubit gates).
     """
     pm = generate_preset_pass_manager(
         basis_gates=["rz", "sx", "x", "cx"], optimization_level=3

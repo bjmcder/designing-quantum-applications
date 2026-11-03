@@ -3,9 +3,9 @@
     python deuteron/main.py --states=8 --backend=ibm_xxx
 
 Finds the ground-state energy of the deuteron with a variational quantum
-eigensolver (VQE) for every combination of qubit mapping (the form of the
-Hamiltonian) and ansatz (the trial circuit). It prints one table comparing them and saves
-a figure with the convergence curves and the final errors.
+eigensolver (VQE) for every combination of qubit mapping, the form of the
+Hamiltonian, and ansatz, the trial circuit. It prints one table comparing
+them and saves a figure with the convergence curves and the final errors.
 
 Without --backend the circuits run on the Aer simulator with exact energies
 (set --shots for sampling noise). Hardware runs every pair in turn, which
@@ -26,6 +26,11 @@ RESULTS = Path(__file__).parent / "results"
 
 
 def main() -> int:
+    """Parse the command line, run every pair, and save the results.
+
+    Returns:
+        Exit status, 0 on success.
+    """
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument(
         "--states",

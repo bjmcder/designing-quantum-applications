@@ -32,24 +32,44 @@ COLORS = {
     "hea_hf": "#E69F00",
 }
 MAPPING_LABELS = {
-    "jw": "Jordan-Wigner\n(4 qubits)",
-    "parity": "Parity\n(4 qubits)",
-    "bk": "Bravyi-Kitaev\n(4 qubits)",
-    "parity2": "Parity, reduced\n(2 qubits)",
+    "jw": "Jordan-Wigner\n4 qubits",
+    "parity": "Parity\n4 qubits",
+    "bk": "Bravyi-Kitaev\n4 qubits",
+    "parity2": "Parity, reduced\n2 qubits",
+}
+
+# Color and line style of each curve in the bond-length scan.
+SCAN_STYLE = {
+    "exact": ("black", "-"),
+    "hf": (COLORS["hf"], ":"),
+    "uccd": (COLORS["uccd"], "--"),
+    "hea": (COLORS["hea"], "-."),
 }
 
 
 def errors(data: dict) -> list[dict]:
-    """Add the error against the exact energy to every run record."""
+    """Add the error against the exact energy to every run record.
+
+    Args:
+        data: Results from ``execution.run``.
+
+    Returns:
+        Copies of the run records with an ``error`` field in hartree.
+    """
     fci = data["exact"]["fci"]
     return [{**r, "error": r["energy"] - fci} for r in data["runs"]]
 
 
 def print_table(data: dict, rows: list[dict]) -> None:
-    """Print the run summary and one line per (mapping, ansatz) pair."""
+    """Print the run summary and one line per (mapping, ansatz) pair.
+
+    Args:
+        data: Results from ``execution.run``.
+        rows: Run records with an error field, from ``errors``.
+    """
     ex = data["exact"]
     shots = f"{data['shots']} shots" if data["shots"] else "exact energies"
-    print(f"\nH2 at R = {data['distance']} A on {data['backend']}, {shots}")
+    print(f"\nH2 at R = {data['distance']} Å on {data['backend']}, {shots}")
     print(f"Exact (FCI) energy:  {ex['fci']:.6f} Ha")
     print(f"Hartree-Fock energy: {ex['hf']:.6f} Ha")
     print(f"Correlation energy:  {ex['fci'] - ex['hf']:+.6f} Ha\n")
@@ -68,13 +88,27 @@ def print_table(data: dict, rows: list[dict]) -> None:
 
 
 def best_trace(run: dict, fci: float) -> np.ndarray:
-    """Running minimum of the error for the restart that ended lowest."""
+    """Running minimum of the error for the restart that ended lowest.
+
+    Args:
+        run: One run record.
+        fci: Exact ground-state energy in hartree.
+
+    Returns:
+        The lowest error so far after each evaluation, in hartree.
+    """
     hist = min(run["history"], key=min)
     return np.minimum.accumulate(np.array(hist) - fci)
 
 
 def plot_convergence(axes, data: dict, rows: list[dict]) -> None:
-    """One panel per mapping: error against evaluations, a line per ansatz."""
+    """Plot the error against evaluations, one panel per mapping.
+
+    Args:
+        axes: One matplotlib axes per mapping.
+        data: Results from ``execution.run``.
+        rows: Run records with an error field, from ``errors``.
+    """
     fci = data["exact"]["fci"]
     for ax, mapping in zip(axes, dict.fromkeys(r["mapping"] for r in rows)):
         for r in (r for r in rows if r["mapping"] == mapping):
@@ -103,8 +137,13 @@ def plot_convergence(axes, data: dict, rows: list[dict]) -> None:
     axes[0].legend(fontsize=8, loc="lower left")
 
 
-def plot_final(ax, data: dict, rows: list[dict]) -> None:
-    """Grouped bars: final error for each mapping (group) and ansatz (color)."""
+def plot_final(ax, rows: list[dict]) -> None:
+    """Plot the final error as grouped bars, a group per mapping.
+
+    Args:
+        ax: Matplotlib axes to draw on.
+        rows: Run records with an error field, from ``errors``.
+    """
     mappings = list(dict.fromkeys(r["mapping"] for r in rows))
     names = list(dict.fromkeys(r["ansatz"] for r in rows))
     width = 0.8 / len(names)
@@ -126,7 +165,7 @@ def plot_final(ax, data: dict, rows: list[dict]) -> None:
         fontsize=8,
     )
     ax.set(
-        title="Final energy error (best of the restarts)",
+        title="Final energy error, best restart",
         yscale="log",
         ylim=(YMIN, 1),
         ylabel="energy error (Ha)",
@@ -137,19 +176,67 @@ def plot_final(ax, data: dict, rows: list[dict]) -> None:
 
 
 def plot_results(data: dict, rows: list[dict], out: Path) -> None:
-    """Save the convergence panels and the final-error bars to ``out``."""
+    """Save the convergence panels and the final-error bars.
+
+    Args:
+        data: Results from ``execution.run``.
+        rows: Run records with an error field, from ``errors``.
+        out: Path of the image file to write.
+    """
     n = len(dict.fromkeys(r["mapping"] for r in rows))
     fig = plt.figure(figsize=(3.4 * n, 8), constrained_layout=True)
     top, bottom = fig.subfigures(2, 1, height_ratios=[1, 1])
     axes = top.subplots(1, n, sharey=True)
     plot_convergence(np.atleast_1d(axes), data, rows)
-    plot_final(bottom.subplots(), data, rows)
+    plot_final(bottom.subplots(), rows)
     fig.savefig(out, dpi=150)
     print(f"\nSaved {out}")
 
 
 def analyze(data: dict, out: Path) -> None:
-    """Print the table and save the figure."""
+    """Print the table and save the figure.
+
+    Args:
+        data: Results from ``execution.run``.
+        out: Path of the image file to write.
+    """
     rows = errors(data)
     print_table(data, rows)
     plot_results(data, rows, out)
+
+
+def plot_dissociation(distances, curves):
+    """Plot the energy and its error against the bond length.
+
+    Args:
+        distances: Bond lengths in angstrom.
+        curves: Energies in hartree at each distance, keyed "exact" and by
+            ansatz.
+
+    Returns:
+        The matplotlib figure.
+    """
+    fig, (energy_ax, error_ax) = plt.subplots(
+        1, 2, figsize=(11, 4), constrained_layout=True
+    )
+    exact = np.array(curves["exact"])
+    for key, energies in curves.items():
+        color, ls = SCAN_STYLE[key]
+        label = "exact FCI" if key == "exact" else LABELS[key]
+        style = {"color": color, "ls": ls, "lw": 2, "label": label}
+        energy_ax.plot(distances, energies, **style)
+        if key != "exact":
+            error = np.maximum(np.array(energies) - exact, FLOOR)
+            error_ax.plot(distances, error, **style)
+    energy_ax.set(
+        xlabel="H-H distance (Å)", ylabel="energy (Ha)", title="Dissociation curve"
+    )
+    energy_ax.legend()
+    error_ax.axhline(CHEMICAL_ACCURACY, color="black", ls="--", lw=1)
+    error_ax.set(
+        xlabel="H-H distance (Å)",
+        ylabel="energy error (Ha)",
+        yscale="log",
+        title="Error relative to FCI",
+    )
+    return fig

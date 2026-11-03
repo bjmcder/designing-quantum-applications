@@ -27,12 +27,18 @@ from scipy.optimize import minimize
 
 
 def get_primitives(backend_name: str | None):
-    """Return (backend, estimator, sampler, session).
+    """Create the backend, the Estimator, the Sampler and, on hardware, a Session.
 
-    The session is None on the simulator.
+    Args:
+        backend_name: IBM backend name, or None for the Aer simulator.
+
+    Returns:
+        (backend, estimator, sampler, session). The session is None on the
+        simulator.
     """
     if backend_name is None:
         return AerSimulator(), AerEstimator(), AerSampler(), None
+    # Only hardware runs need qiskit_ibm_runtime and a saved IBM account.
     from qiskit_ibm_runtime import (
         EstimatorV2,
         QiskitRuntimeService,
@@ -49,9 +55,18 @@ def get_primitives(backend_name: str | None):
 
 
 def run_qaoa(estimator, circuit, hamiltonian, x0, shots: int, maxiter: int):
-    """Minimize <H>(theta) with COBYLA from the starting angles ``x0``.
+    """Minimize <H>(theta) with COBYLA.
 
-    Returns the optimizer result and the list of every energy it evaluated.
+    Args:
+        estimator: Estimator primitive that returns <H>.
+        circuit: Transpiled QAOA circuit.
+        hamiltonian: Cost Hamiltonian on the same qubit layout as ``circuit``.
+        x0: Starting angles (beta, gamma) in radians.
+        shots: Shots per energy estimate.
+        maxiter: Maximum optimizer iterations.
+
+    Returns:
+        (optimizer result, list of every energy evaluated).
     """
     history = []
     # The Estimator takes a target standard error rather than a shot count.
@@ -59,6 +74,7 @@ def run_qaoa(estimator, circuit, hamiltonian, x0, shots: int, maxiter: int):
     precision = 1 / np.sqrt(shots)
 
     def cost(theta):
+        """Energy at the angles ``theta``, recorded in ``history``."""
         job = estimator.run([(circuit, hamiltonian, theta, precision)])
         history.append(float(job.result()[0].data.evs))
         return history[-1]
@@ -78,10 +94,22 @@ def run(
     maxiter=150,
     seed=1,
 ) -> dict:
-    """Optimize the QAOA circuit, sample it, and return a dict of results.
+    """Optimize the QAOA circuit, sample it, and return the results.
 
-    The dict holds the settings, the energy history of every restart, the
-    best angles, and the sampled counts (everything analysis.py needs).
+    Args:
+        sequence: Chain of H and P beads.
+        grid: Grid size, such as (2, 3).
+        encoding: Bit code, one of ``encoding.ENCODINGS``.
+        backend_name: IBM backend name, or None for the Aer simulator.
+        reps: Number of QAOA layers p.
+        starts: Random restarts of the optimizer.
+        shots: Shots per energy estimate and for the final sampling.
+        maxiter: Maximum optimizer iterations per restart.
+        seed: Seed for the random starting angles.
+
+    Returns:
+        The settings, the energy history of every restart, the best angles,
+        and the sampled counts, as ``analysis.analyze`` expects.
     """
     hamiltonian, cards, _ = build_hamiltonian(encoding, sequence, grid)
     ansatz = build_ansatz(hamiltonian, cards, encoding, reps)

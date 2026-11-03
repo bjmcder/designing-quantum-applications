@@ -59,7 +59,14 @@ Poly = dict[frozenset, float]
 
 
 def padd(*polys: Poly) -> Poly:
-    """Sum of polynomials."""
+    """Sum of polynomials.
+
+    Args:
+        *polys: Polynomials in the bits.
+
+    Returns:
+        Their sum.
+    """
     out: Poly = {}
     for p in polys:
         for mono, c in p.items():
@@ -68,7 +75,15 @@ def padd(*polys: Poly) -> Poly:
 
 
 def pmul(a: Poly, b: Poly) -> Poly:
-    """Product of two polynomials (using x * x = x for each bit)."""
+    """Product of two polynomials, using x * x = x for each bit.
+
+    Args:
+        a: First polynomial.
+        b: Second polynomial.
+
+    Returns:
+        Their product.
+    """
     out: Poly = {}
     for ma, ca in a.items():
         for mb, cb in b.items():
@@ -77,12 +92,28 @@ def pmul(a: Poly, b: Poly) -> Poly:
 
 
 def pscale(p: Poly, s: float) -> Poly:
-    """Polynomial times a number."""
+    """Polynomial times a number.
+
+    Args:
+        p: Polynomial in the bits.
+        s: Scale factor.
+
+    Returns:
+        The scaled polynomial.
+    """
     return {m: c * s for m, c in p.items()}
 
 
 def evaluate(p: Poly, bits: str) -> float:
-    """Classical value of the polynomial for a bitstring in qubit order."""
+    """Classical value of a polynomial for one bitstring.
+
+    Args:
+        p: Polynomial in the bits.
+        bits: Bitstring in qubit order.
+
+    Returns:
+        The value of ``p``.
+    """
     return sum(c for m, c in p.items() if all(bits[k] == "1" for k in m))
 
 
@@ -91,6 +122,13 @@ def matches(offset: int, code: str) -> Poly:
 
     Each position contributes x_k if the code has a 1 there, or (1 - x_k) if
     it has a 0. The product is 1 only when every bit agrees.
+
+    Args:
+        offset: Index of the first bit.
+        code: Bit pattern to match.
+
+    Returns:
+        The indicator polynomial.
     """
     poly: Poly = {frozenset(): 1.0}
     for k, bit in enumerate(code):
@@ -101,7 +139,18 @@ def matches(offset: int, code: str) -> Poly:
 
 
 def indicator(offset: int, r: int, c: int, encoding: str, g: int) -> Poly:
-    """y = 1 exactly when the block starting at ``offset`` encodes choice r."""
+    """Polynomial y that is 1 exactly when a bead's block encodes choice r.
+
+    Args:
+        offset: Index of the block's first bit.
+        r: Choice to detect.
+        c: Number of choices for the bead.
+        encoding: Bit code, one of ``encoding.ENCODINGS``.
+        g: Block size of the "bu" code, ignored otherwise.
+
+    Returns:
+        The indicator polynomial.
+    """
     code = encode(r, c, encoding, g)
     if encoding == "unary":
         # One-hot: choice r is "bit r is set", whatever the other bits are.
@@ -114,12 +163,32 @@ def indicator(offset: int, r: int, c: int, encoding: str, g: int) -> Poly:
 
 
 def adjacent(s: tuple, t: tuple) -> bool:
-    """True if two lattice sites are nearest neighbors."""
+    """Check whether two lattice sites are nearest neighbors.
+
+    Args:
+        s: First site.
+        t: Second site.
+
+    Returns:
+        True if the sites are one grid step apart.
+    """
     return sum(abs(a - b) for a, b in zip(s, t)) == 1
 
 
 def fold_poly(sequence, grid, encoding, g=3, eps=EPS, lam=LAM) -> Poly:
-    """The full cost of a bitstring as a polynomial in the bits."""
+    """Full cost of a bitstring as a polynomial in the bits.
+
+    Args:
+        sequence: Chain of H and P beads.
+        grid: Grid size, such as (2, 3).
+        encoding: Bit code, one of ``encoding.ENCODINGS``.
+        g: Block size of the "bu" code, ignored otherwise.
+        eps: Energy gained per H-H contact.
+        lam: Penalty weight for a broken rule.
+
+    Returns:
+        The cost polynomial.
+    """
     n = len(sequence)
     cards = coordinate_cardinality(n, grid)
     sites = coordinate_sites(grid)
@@ -173,8 +242,15 @@ def to_ising(poly: Poly, n_qubits: int) -> SparsePauliOp:
     """Substitute x = (1 - Z) / 2 into every monomial.
 
     A product of m bits expands into 2^m terms, one for each subset of the
-    m bits (the Pauli-Z string on that subset). The expansion of
-    x_a * x_b, for example, is (1 - Z_a - Z_b + Z_a Z_b) / 4.
+    m bits, the Pauli-Z string on that subset. For example x_a * x_b expands
+    to (1 - Z_a - Z_b + Z_a Z_b) / 4.
+
+    Args:
+        poly: Polynomial in the bits.
+        n_qubits: Total number of qubits.
+
+    Returns:
+        The Ising Hamiltonian as a sum of Pauli-Z strings.
     """
     terms: dict[frozenset, float] = {}
     for mono, c in poly.items():
@@ -196,8 +272,18 @@ def to_ising(poly: Poly, n_qubits: int) -> SparsePauliOp:
 
 
 def build_hamiltonian(encoding="binary", sequence=SEQUENCE, grid=GRID, g=3):
-    """Return (H, cards, poly): the Hamiltonian, the cardinality vector,
-    and the polynomial it came from (handy for checking H)."""
+    """Cost Hamiltonian of the folding problem.
+
+    Args:
+        encoding: Bit code, one of ``encoding.ENCODINGS``.
+        sequence: Chain of H and P beads.
+        grid: Grid size, such as (2, 3).
+        g: Block size of the "bu" code, ignored otherwise.
+
+    Returns:
+        (H, cards, poly): the Ising Hamiltonian, the cardinality vector, and
+        the cost polynomial that H was built from.
+    """
     cards = coordinate_cardinality(len(sequence), grid)
     n = sum(block_size(c, encoding, g) for c in cards)
     poly = fold_poly(sequence, grid, encoding, g)
@@ -210,7 +296,16 @@ def build_hamiltonian(encoding="binary", sequence=SEQUENCE, grid=GRID, g=3):
 
 
 def is_valid_fold(coords) -> bool:
-    """Every bead placed, no shared sites, chain neighbors adjacent."""
+    """Check that a decoded fold obeys every rule.
+
+    Every bead is placed, no site is shared, and chain neighbors are adjacent.
+
+    Args:
+        coords: Bead coordinates, or None for an invalid code.
+
+    Returns:
+        True for a valid fold.
+    """
     return (
         coords is not None
         and is_self_avoiding(coords)
@@ -219,7 +314,18 @@ def is_valid_fold(coords) -> bool:
 
 
 def fold_energy(coords, sequence=SEQUENCE, eps=EPS) -> float:
-    """HP energy: -eps for each H-H contact between non-chain-neighbors."""
+    """HP energy of a fold.
+
+    Each H-H contact between beads that are not chain neighbors adds -eps.
+
+    Args:
+        coords: Bead coordinates.
+        sequence: Chain of H and P beads.
+        eps: Energy gained per H-H contact.
+
+    Returns:
+        The energy.
+    """
     contacts = sum(
         1
         for i, j in combinations(range(len(sequence)), 2)
@@ -233,13 +339,20 @@ def fold_energy(coords, sequence=SEQUENCE, eps=EPS) -> float:
 def enumerate_folds(sequence=SEQUENCE, grid=GRID):
     """Every self-avoiding placement of the chain, by depth-first search.
 
-    Yields lists of coordinates. Rotated and mirrored copies are yielded
-    separately. This is the exact answer to compare the quantum samples
-    against, and it avoids looping over all 2^n bitstrings.
+    This is the exact answer to compare the quantum samples against, and it
+    avoids looping over all 2^n bitstrings.
+
+    Args:
+        sequence: Chain of H and P beads.
+        grid: Grid size, such as (2, 3).
+
+    Yields:
+        Bead coordinates. Rotated and mirrored copies are yielded separately.
     """
     sites = list(product(*(range(n) for n in grid)))
 
     def extend(path):
+        """Yield every completion of the partial chain ``path``."""
         if len(path) == len(sequence):
             yield list(path)
             return
@@ -252,7 +365,14 @@ def enumerate_folds(sequence=SEQUENCE, grid=GRID):
 
 
 def auto_grid(n_beads: int) -> tuple[int, int]:
-    """Smallest near-square grid with at least n_beads sites."""
+    """Smallest near-square grid with at least ``n_beads`` sites.
+
+    Args:
+        n_beads: Length of the chain.
+
+    Returns:
+        The grid size (rows, columns).
+    """
     candidates = [
         (a, b)
         for a in range(1, n_beads + 1)

@@ -3,8 +3,8 @@
     python hydrogen-molecule/main.py --distance=0.735 --backend=ibm_xxx
 
 Finds the ground-state energy of H2 with a variational quantum eigensolver
-(VQE) for every combination of qubit mapping (the form of the Hamiltonian)
-and ansatz (the trial circuit). It prints one table comparing them and saves
+(VQE) for every combination of qubit mapping, the form of the Hamiltonian,
+and ansatz, the trial circuit. It prints one table comparing them and saves
 a figure with the convergence curves and the final errors.
 
 Without --backend the circuits run on the Aer simulator with exact energies
@@ -26,6 +26,11 @@ RESULTS = Path(__file__).parent / "results"
 
 
 def main() -> int:
+    """Parse the command line, run every pair, and save the results.
+
+    Returns:
+        Exit status, 0 on success.
+    """
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument(
         "--distance",
@@ -79,7 +84,7 @@ def main() -> int:
     )
 
     RESULTS.mkdir(exist_ok=True)
-    # No dots in the stem: with_suffix would treat ".735" as an extension.
+    # Write 0.735 as 0p735 so the file name has only one dot.
     stem = f"h2_{args.distance:g}A_{data['backend']}".replace(".", "p")
     (RESULTS / f"{stem}.json").write_text(json.dumps(data, indent=2))
     analyze(data, RESULTS / f"{stem}.png")

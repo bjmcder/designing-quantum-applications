@@ -28,9 +28,17 @@ from scipy.optimize import minimize
 
 
 def get_primitives(backend_name: str | None):
-    """Return (backend, estimator, session). The session is None on Aer."""
+    """Create the backend, the Estimator and, on hardware, a Session.
+
+    Args:
+        backend_name: IBM backend name, or None for the Aer simulator.
+
+    Returns:
+        (backend, estimator, session). The session is None on the simulator.
+    """
     if backend_name is None:
         return AerSimulator(), AerEstimator(), None
+    # Only hardware runs need qiskit_ibm_runtime and a saved IBM account.
     from qiskit_ibm_runtime import EstimatorV2, QiskitRuntimeService, Session
 
     backend = QiskitRuntimeService().backend(backend_name)
@@ -40,14 +48,25 @@ def get_primitives(backend_name: str | None):
 
 
 def minimize_energy(estimator, circuit, hamiltonian, x0, precision, maxiter):
-    """Minimize <H>(theta) with COBYLA from the starting angles ``x0``.
+    """Minimize <H>(theta) with COBYLA.
 
-    Returns the best angles and the list of every energy evaluated. An
-    ansatz without angles (Hartree-Fock) is evaluated once.
+    An ansatz without angles, such as Hartree-Fock, is evaluated once.
+
+    Args:
+        estimator: Estimator primitive that returns <H>.
+        circuit: Transpiled ansatz.
+        hamiltonian: Hamiltonian on the same qubit layout as ``circuit``.
+        x0: Starting angles in radians.
+        precision: Target standard error of each energy, 0 for exact energies.
+        maxiter: Maximum optimizer iterations.
+
+    Returns:
+        (best angles, list of every energy evaluated).
     """
     history = []
 
     def energy(theta):
+        """Energy at the angles ``theta``, recorded in ``history``."""
         job = estimator.run([(circuit, hamiltonian, theta, precision)])
         history.append(float(job.result()[0].data.evs))
         return history[-1]
@@ -77,10 +96,24 @@ def optimize(
     maxiter: int = 300,
     seed: int = 1,
 ) -> dict:
-    """Run the loop for one pair and return its record.
+    """Run the loop for one (mapping, ansatz) pair.
 
-    ``shots = 0`` asks the simulator for exact energies. Otherwise the
-    Estimator is asked for a standard error of 1 / sqrt(shots).
+    Args:
+        distance: Bond length in angstrom.
+        mapping: Qubit mapping, one of ``ops.MAPPINGS``.
+        ansatz_name: Ansatz, one of ``encoding.ANSATZES``.
+        estimator: Estimator primitive from ``get_primitives``.
+        backend: Backend to transpile the circuits for.
+        reps: Layers of the hardware-efficient ansatzes.
+        starts: Random restarts of the optimizer.
+        shots: Shots per energy. 0 gives exact energies on the simulator;
+            otherwise the target standard error is 1 / sqrt(shots) hartree.
+        maxiter: Maximum optimizer iterations per restart.
+        seed: Seed for the random starting angles.
+
+    Returns:
+        The run record: problem size, circuit cost, energy history of every
+        restart, best energy in hartree, and best angles.
     """
     hamiltonian = build_hamiltonian(distance, mapping)
     ansatz = build_ansatz(ansatz_name, mapping, reps)
@@ -126,11 +159,27 @@ def run(
     maxiter: int = 300,
     seed: int = 1,
 ) -> dict:
-    """Optimize every pair and return a dict of results for analysis.py."""
+    """Optimize every (mapping, ansatz) pair.
+
+    Args:
+        distance: Bond length in angstrom.
+        mappings: Qubit mappings to try.
+        ansatzes: Ansatzes to try.
+        backend_name: IBM backend name, or None for the Aer simulator.
+        reps: Layers of the hardware-efficient ansatzes.
+        starts: Random restarts of the optimizer.
+        shots: Shots per energy, 0 for exact energies on the simulator.
+        maxiter: Maximum optimizer iterations per restart.
+        seed: Seed for the random starting angles.
+
+    Returns:
+        The settings, the exact energies, the run time, and one run record per
+        pair, as ``analysis.analyze`` expects.
+    """
     backend, estimator, session = get_primitives(backend_name)
     exact = exact_energies(distance)
     print(
-        f"R = {distance} A: exact (FCI) energy {exact['fci']:.6f} Ha, "
+        f"R = {distance} Å: exact FCI energy {exact['fci']:.6f} Ha, "
         f"Hartree-Fock {exact['hf']:.6f} Ha"
     )
     t0 = time.perf_counter()

@@ -1,6 +1,6 @@
 """Encoding: build the ansatz for the lattice protein folding example.
 
-Follows Linn et al. (2024); see 03-Applications/lattice-folding-encodings.md.
+Follows Linn et al. (2024), summarized in info/lattice-folding-encodings.md.
 
 A conformation (a fold) is one choice per bead out of c_i options. The list
 of option counts (c_1, ..., c_N) is the "cardinality vector". Each choice is
@@ -39,7 +39,13 @@ ENCODINGS = ("unary", "binary", "bu")
 def block_size(c: int, encoding: str, g: int = 3) -> int:
     """Number of bits that encode one choice among c options.
 
-    ``g`` is the block size for the "bu" code and is ignored otherwise.
+    Args:
+        c: Number of options.
+        encoding: Bit code, one of ``ENCODINGS``.
+        g: Block size of the "bu" code, ignored otherwise.
+
+    Returns:
+        The block size in bits, 0 when the choice is forced.
     """
     if c == 1:
         return 0  # a forced choice needs no qubit
@@ -51,9 +57,18 @@ def block_size(c: int, encoding: str, g: int = 3) -> int:
 
 
 def encode(r: int, c: int, encoding: str, g: int = 3) -> str:
-    """Bit string for choice r in range(c). Matches Table I of the paper.
+    """Bit string for choice r, as in Table I of Linn et al.
 
-    Example for c = 5, r = 3:  unary 00010, binary 011, bu (g=3) 0100.
+    Example for c = 5, r = 3: unary 00010, binary 011, bu with g = 3 0100.
+
+    Args:
+        r: Choice, 0 to c - 1.
+        c: Number of options.
+        encoding: Bit code, one of ``ENCODINGS``.
+        g: Block size of the "bu" code, ignored otherwise.
+
+    Returns:
+        The bit string.
     """
     n = block_size(c, encoding, g)
     if n == 0:
@@ -71,10 +86,19 @@ def encode(r: int, c: int, encoding: str, g: int = 3) -> str:
 
 
 def decode(bits: str, c: int, encoding: str, g: int = 3) -> int | None:
-    """Choice r for a bit string, or None if the code is invalid.
+    """Choice r for a bit string.
 
     Invalid codes are the ones that pick no option or more than one, or
-    that name an option beyond c (for example 101 in binary when c = 5).
+    that name an option beyond c, for example 101 in binary when c = 5.
+
+    Args:
+        bits: Bit string of one bead.
+        c: Number of options.
+        encoding: Bit code, one of ``ENCODINGS``.
+        g: Block size of the "bu" code, ignored otherwise.
+
+    Returns:
+        The choice r, or None if the code is invalid.
     """
     if c == 1:
         return 0
@@ -96,11 +120,18 @@ def decode(bits: str, c: int, encoding: str, g: int = 3) -> int | None:
 
 
 def coordinate_cardinality(n_beads: int, grid: tuple[int, ...]) -> list[int]:
-    """Number of choices per bead: ceil(S/2), floor(S/2), ... (Eqs. 2-3).
+    """Number of choices per bead in the coordinate model, Eqs. 2-3.
 
-    S is the number of grid sites. Consecutive beads sit on opposite colors
-    of the checkerboard, so each bead can use only the sites of its own
-    color. Bead 0 gets the larger color (the one containing site (0, 0)).
+    Consecutive beads sit on opposite colors of the checkerboard, so each bead
+    can use only the sites of its own color. Bead 0 gets the larger color, the
+    one containing site (0, 0).
+
+    Args:
+        n_beads: Length of the chain.
+        grid: Grid size, such as (2, 3).
+
+    Returns:
+        The cardinality vector ceil(S/2), floor(S/2), ... for S grid sites.
     """
     sites = 1
     for length in grid:
@@ -111,17 +142,33 @@ def coordinate_cardinality(n_beads: int, grid: tuple[int, ...]) -> list[int]:
 
 
 def turn_cardinality(n_beads: int, dim: int) -> list[int]:
-    """Choices for turns 1..N-2 (Eqs. 4-5 with the symmetry fixing of App. C).
+    """Number of choices per turn in the turn model, Eqs. 4-5 with App. C.
 
-    Turn 0 is fixed to +x (no qubits). Turn 1 is +x or +y (c = 2), because
-    every other direction is a rotation of these or doubles back. The
-    remaining turns pick any of the 2*dim directions.
+    Turn 0 is fixed to +x and needs no qubits. Turn 1 is +x or +y, c = 2,
+    because every other direction is a rotation of these or doubles back.
+    The remaining turns pick any of the 2 * dim directions.
+
+    Args:
+        n_beads: Length of the chain.
+        dim: Lattice dimension.
+
+    Returns:
+        The cardinality vector for turns 1 to N - 2.
     """
     return [2] + [2 * dim] * (n_beads - 3) if n_beads >= 3 else []
 
 
 def n_qubits(cards: list[int], encoding: str, g: int = 3) -> int:
-    """Total conformation qubits (Table II)."""
+    """Total number of conformation qubits, Table II.
+
+    Args:
+        cards: Cardinality vector.
+        encoding: Bit code, one of ``ENCODINGS``.
+        g: Block size of the "bu" code, ignored otherwise.
+
+    Returns:
+        The qubit count.
+    """
     return sum(block_size(c, encoding, g) for c in cards)
 
 
@@ -129,14 +176,28 @@ def n_qubits(cards: list[int], encoding: str, g: int = 3) -> int:
 
 
 def bits_from_key(key: str) -> str:
-    """Convert a Qiskit counts key (qubit 0 rightmost) to qubit order."""
+    """Convert a Qiskit counts key, with qubit 0 rightmost, to qubit order.
+
+    Args:
+        key: Bitstring from ``get_counts``.
+
+    Returns:
+        The bitstring with qubit 0 first.
+    """
     return key.replace(" ", "")[::-1]
 
 
 def split_choices(bits: str, cards: list[int], encoding: str, g: int = 3):
     """Split a bitstring into one block per bead and decode each block.
 
-    Returns a list with the choice r (or None if invalid) for every bead.
+    Args:
+        bits: Bitstring in qubit order.
+        cards: Cardinality vector.
+        encoding: Bit code, one of ``ENCODINGS``.
+        g: Block size of the "bu" code, ignored otherwise.
+
+    Returns:
+        The choice r of every bead, or None for a bead with an invalid code.
     """
     choices, pos = [], 0
     for c in cards:
@@ -149,8 +210,13 @@ def split_choices(bits: str, cards: list[int], encoding: str, g: int = 3):
 def coordinate_sites(grid: tuple[int, ...]) -> list[list[tuple[int, ...]]]:
     """Lattice sites split by color, in row-major order.
 
-    Returns [even_sites, odd_sites], where a site's color is the parity of
-    the sum of its coordinates.
+    A site's color is the parity of the sum of its coordinates.
+
+    Args:
+        grid: Grid size, such as (2, 3).
+
+    Returns:
+        [even_sites, odd_sites].
     """
     sites = [()]
     for length in grid:
@@ -159,9 +225,19 @@ def coordinate_sites(grid: tuple[int, ...]) -> list[list[tuple[int, ...]]]:
 
 
 def decode_coordinate(bits, n_beads, grid, encoding, g=3):
-    """Bead coordinates from a bitstring, or None if a bead's code is invalid.
+    """Bead coordinates from a bitstring in the coordinate model.
 
     Each bead's choice r indexes the list of sites of that bead's color.
+
+    Args:
+        bits: Bitstring in qubit order.
+        n_beads: Length of the chain.
+        grid: Grid size, such as (2, 3).
+        encoding: Bit code, one of ``ENCODINGS``.
+        g: Block size of the "bu" code, ignored otherwise.
+
+    Returns:
+        The bead coordinates, or None if a bead's code is invalid.
     """
     cards = coordinate_cardinality(n_beads, grid)
     parity_sites = coordinate_sites(grid)
@@ -172,7 +248,14 @@ def decode_coordinate(bits, n_beads, grid, encoding, g=3):
 
 
 def turn_directions(dim: int) -> list[tuple[int, ...]]:
-    """+x, -x, +y, -y, (+z, -z) as unit vectors."""
+    """Unit steps +x, -x, +y, -y and, in 3D, +z, -z.
+
+    Args:
+        dim: Lattice dimension.
+
+    Returns:
+        The 2 * dim unit vectors.
+    """
     return [
         tuple(s if k == axis else 0 for k in range(dim))
         for axis in range(dim)
@@ -181,10 +264,20 @@ def turn_directions(dim: int) -> list[tuple[int, ...]]:
 
 
 def decode_turn(bits, n_beads, dim, encoding, g=3):
-    """Bead coordinates from a turn bitstring, or None if a code is invalid.
+    """Bead coordinates from a bitstring in the turn model.
 
     Beads sit at the running sum of turns. Turn 0 is +x. Turn 1 uses
-    r=0 -> +y and r=1 -> +x (so the single binary bit q0 = 1 means +x).
+    r = 0 for +y and r = 1 for +x, so the single binary bit q0 = 1 means +x.
+
+    Args:
+        bits: Bitstring in qubit order.
+        n_beads: Length of the chain.
+        dim: Lattice dimension.
+        encoding: Bit code, one of ``ENCODINGS``.
+        g: Block size of the "bu" code, ignored otherwise.
+
+    Returns:
+        The bead coordinates, or None if a turn's code is invalid.
     """
     cards = turn_cardinality(n_beads, dim)
     choices = split_choices(bits, cards, encoding, g)
@@ -204,7 +297,14 @@ def decode_turn(bits, n_beads, dim, encoding, g=3):
 
 
 def is_self_avoiding(coords) -> bool:
-    """True if no two beads share a lattice site."""
+    """Check that no two beads share a lattice site.
+
+    Args:
+        coords: Bead coordinates.
+
+    Returns:
+        True if every site is used at most once.
+    """
     return len(set(coords)) == len(coords)
 
 
@@ -212,7 +312,14 @@ def is_self_avoiding(coords) -> bool:
 
 
 def one_hot_blocks(cards: list[int]) -> list[range]:
-    """Qubit ranges of each unary block."""
+    """Qubit ranges of the unary blocks.
+
+    Args:
+        cards: Cardinality vector.
+
+    Returns:
+        One range of qubit indices per bead.
+    """
     blocks, pos = [], 0
     for c in cards:
         blocks.append(range(pos, pos + block_size(c, "unary")))
@@ -221,10 +328,16 @@ def one_hot_blocks(cards: list[int]) -> list[range]:
 
 
 def xy_mixer(cards: list[int]) -> SparsePauliOp:
-    """Mixer that swaps a "1" between neighboring qubits of each unary block.
+    """Mixer that swaps a 1 between neighboring qubits of each unary block.
 
     The terms (XX + YY) / 2 conserve the number of 1s in a block, so a state
-    that starts one-hot (a single 1 per block) stays one-hot.
+    that starts one-hot, with a single 1 per block, stays one-hot.
+
+    Args:
+        cards: Cardinality vector.
+
+    Returns:
+        The mixer operator.
     """
     n, terms = n_qubits(cards, "unary"), []
     for block in one_hot_blocks(cards):
@@ -240,7 +353,14 @@ def xy_mixer(cards: list[int]) -> SparsePauliOp:
 
 
 def one_hot_start(cards: list[int]) -> QuantumCircuit:
-    """Initial state with the first option set in every unary block."""
+    """Initial state with the first option set in every unary block.
+
+    Args:
+        cards: Cardinality vector.
+
+    Returns:
+        The state-preparation circuit.
+    """
     qc = QuantumCircuit(n_qubits(cards, "unary"))
     for block in one_hot_blocks(cards):
         qc.x(block[0])
@@ -252,11 +372,20 @@ def build_ansatz(
 ):
     """QAOA ansatz for the folding cost operator.
 
-    binary / bu: start in |+>^n and use the standard X mixer. Every
+    binary and bu: start in |+>^n and use the standard X mixer. Every
     bitstring is reachable, so every rule must be a penalty in the cost.
     unary: start in a one-hot state and use the XY mixer, so the circuit
-    itself never leaves the "one site per bead" states. (The cost in ops.py
-    still penalizes them, which does no harm.)
+    itself never leaves the "one site per bead" states. The one-hot penalty
+    in ops.py is then zero on every state the circuit reaches.
+
+    Args:
+        cost: Cost Hamiltonian H_C.
+        cards: Cardinality vector.
+        encoding: Bit code, one of ``ENCODINGS``.
+        reps: Number of QAOA layers p.
+
+    Returns:
+        The QAOA circuit with 2 * reps symbolic angles.
     """
     if encoding == "unary":
         return QAOAAnsatz(
@@ -267,16 +396,3 @@ def build_ansatz(
         )
     return QAOAAnsatz(cost, reps=reps)
 
-
-if __name__ == "__main__":
-    # Table I check: c = 5
-    for r in range(5):
-        print(r, *(encode(r, 5, e) for e in ENCODINGS))
-
-    # N = 4 on a 2x2 grid, binary: 0110 is a U-shaped fold
-    print(decode_coordinate("0110", 4, (2, 2), "binary"))
-
-    # N = 5 cubic turn model, binary: 7 qubits.
-    # The bits 0 001 001 mean +y, -x, -x after the fixed first step +x.
-    cards = turn_cardinality(5, 3)
-    print(n_qubits(cards, "binary"), decode_turn("0001001", 5, 3, "binary"))

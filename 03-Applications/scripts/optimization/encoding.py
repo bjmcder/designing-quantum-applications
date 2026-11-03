@@ -1,6 +1,6 @@
 """Encoding: build the ansatz for the traveling salesman example.
 
-Encoding: one bit (one qubit) for each pair (city c, step t). The bit
+Bits: one bit, and so one qubit, for each pair (city c, step t). The bit
 x[c, t] is 1 when city c is visited at step t. City 0 is fixed at step 0, so
 n cities need (n - 1)^2 qubits. Written as a table with one row per city and
 one column per step, a bitstring is a valid tour only when every row and
@@ -16,20 +16,41 @@ from qiskit.quantum_info import SparsePauliOp
 
 
 def n_qubits(n_cities: int) -> int:
-    """Qubits needed for n cities: an (n - 1) x (n - 1) table of bits."""
+    """Number of qubits for a tour: an (n - 1) x (n - 1) table of bits.
+
+    Args:
+        n_cities: Number of cities n.
+
+    Returns:
+        (n - 1)^2.
+    """
     return (n_cities - 1) ** 2
 
 
 def bits_from_key(key: str) -> str:
-    """Convert a Qiskit counts key (qubit 0 rightmost) to qubit order."""
+    """Convert a Qiskit counts key, with qubit 0 rightmost, to qubit order.
+
+    Args:
+        key: Bitstring from ``get_counts``.
+
+    Returns:
+        The bitstring with qubit 0 first.
+    """
     return key.replace(" ", "")[::-1]
 
 
 def decode_tour(bits: str, n_cities: int) -> list[int] | None:
-    """Tour [0, c1, c2, ...] from a bitstring, or None if it is not a tour.
+    """Tour from a bitstring.
 
-    The bitstring is in qubit order. Qubit (c - 1) * (n - 1) + (t - 1) holds
-    x[c, t], so the table is stored row by row, one row per city.
+    Qubit (c - 1) * (n - 1) + (t - 1) holds x[c, t], so the table is stored
+    row by row, one row per city.
+
+    Args:
+        bits: Bitstring in qubit order.
+        n_cities: Number of cities n.
+
+    Returns:
+        The tour [0, c1, c2, ...], or None if the bits are not a tour.
     """
     m = n_cities - 1
     x = [
@@ -47,16 +68,26 @@ def decode_tour(bits: str, n_cities: int) -> list[int] | None:
 
 
 def tour_length(tour: list[int], dist) -> float:
-    """Total cost of the closed tour (including the leg back to the start).
+    """Total cost of the closed tour, including the leg back to the start.
 
-    ``dist[a, b]`` is the cost of going from city a to city b.
+    Args:
+        tour: Cities in visiting order.
+        dist: Cost matrix, dist[a, b] = cost of going from city a to city b.
+
+    Returns:
+        The tour cost.
     """
     return float(sum(dist[a, b] for a, b in zip(tour, tour[1:] + tour[:1])))
 
 
 def build_ansatz(cost: SparsePauliOp, reps: int = 2) -> QAOAAnsatz:
-    """QAOA ansatz with ``reps`` layers.
+    """QAOA ansatz with one beta and one gamma per layer.
 
-    It has 2 * reps angles: one beta (mixer) and one gamma (cost) per layer.
+    Args:
+        cost: Cost Hamiltonian H_C.
+        reps: Number of QAOA layers p.
+
+    Returns:
+        The QAOA circuit with 2 * reps symbolic angles.
     """
     return QAOAAnsatz(cost, reps=reps)

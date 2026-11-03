@@ -27,12 +27,24 @@ MAX_SIM_QUBITS = 22
 
 
 def parse_grid(text: str) -> tuple[int, int]:
-    """Turn a command-line grid size such as "2x3" into (2, 3)."""
+    """Turn a command-line grid size such as "2x3" into (2, 3).
+
+    Args:
+        text: Grid size as rows x columns.
+
+    Returns:
+        The grid size.
+    """
     a, b = text.lower().split("x")
     return int(a), int(b)
 
 
 def main() -> int:
+    """Parse the command line, run QAOA, and save the results.
+
+    Returns:
+        Exit status, 0 on success.
+    """
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument(
         "sequence", help='Chain of H and P beads, for example "HPPHHP".'

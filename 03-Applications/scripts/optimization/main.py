@@ -26,6 +26,11 @@ MAX_SIM_QUBITS = 22
 
 
 def main() -> int:
+    """Parse the command line, run QAOA, and save the results.
+
+    Returns:
+        Exit status, 0 on success.
+    """
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument(
         "cities", type=Path, help="JSON file with 'cities' and 'costs'."

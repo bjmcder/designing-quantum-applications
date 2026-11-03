@@ -24,16 +24,27 @@ ORANGE, BLUE, GRAY = "#D55E00", "#0072B2", "#999999"
 
 
 def all_tours(n: int) -> list[list[int]]:
-    """Every tour starting at city 0 (a reversed tour is listed separately)."""
+    """Every tour that starts at city 0.
+
+    Args:
+        n: Number of cities.
+
+    Returns:
+        The (n - 1)! tours. A tour and its reverse are listed separately.
+    """
     return [[0, *p] for p in permutations(range(1, n))]
 
 
 def rank_tours(data: dict) -> tuple[list[dict], float]:
     """Decode the counts and rank the valid tours.
 
-    Returns (ranked, p_invalid). ``ranked`` is sorted by cost, then by
-    sampling probability. ``p_invalid`` is the probability of a bitstring
-    that is not a tour.
+    Args:
+        data: Results from ``execution.run``.
+
+    Returns:
+        (ranked, p_invalid). ``ranked`` holds one record per distinct tour,
+        sorted by cost and then by sampling probability. ``p_invalid`` is the
+        probability of a bitstring that is not a tour.
     """
     dist = np.array(data["costs"])
     shots = sum(data["counts"].values())
@@ -57,14 +68,29 @@ def rank_tours(data: dict) -> tuple[list[dict], float]:
 
 
 def tour_names(tour: list[int], names: list[str]) -> str:
-    """Write a tour with city names, for example "A -> B -> C -> A"."""
+    """Write a tour with city names, for example "A -> B -> C -> A".
+
+    Args:
+        tour: Cities in visiting order.
+        names: City names.
+
+    Returns:
+        The tour as text.
+    """
     return " -> ".join(names[c] for c in [*tour, tour[0]])
 
 
 def print_ranking(
     data: dict, ranked: list[dict], p_invalid: float, top: int
 ) -> None:
-    """Print the run summary and the table of the cheapest ``top`` tours."""
+    """Print the run summary and the cheapest ``top`` tours.
+
+    Args:
+        data: Results from ``execution.run``.
+        ranked: Records from ``rank_tours``.
+        p_invalid: Probability of an invalid sample.
+        top: Number of rows to print.
+    """
     print(
         f"\n{len(data['cities'])} cities, {data['backend']}, "
         f"{data['shots']} shots"
@@ -84,9 +110,16 @@ def print_ranking(
 
 
 def draw_tour(ax, tour: list[int], names: list[str], dist, title: str) -> None:
-    """Draw the cities on a circle and the tour as labeled arrows.
+    """Draw the cities on a circle and the tour as arrows labeled with leg costs.
 
-    Each arrow carries the cost of that leg. The start city is orange.
+    The start city is orange.
+
+    Args:
+        ax: Matplotlib axes to draw on.
+        tour: Cities in visiting order.
+        names: City names.
+        dist: Cost matrix.
+        title: Axes title.
     """
     angles = 2 * np.pi * np.arange(len(names)) / len(names) + np.pi / 2
     pos = np.c_[np.cos(angles), np.sin(angles)]
@@ -124,7 +157,14 @@ def draw_tour(ax, tour: list[int], names: list[str], dist, title: str) -> None:
 def plot_results(
     data: dict, ranked: list[dict], p_invalid: float, out: Path
 ) -> None:
-    """Save the cheapest tour and the tour spectrum to ``out``."""
+    """Save the cheapest tour and the tour spectrum.
+
+    Args:
+        data: Results from ``execution.run``.
+        ranked: Records from ``rank_tours``.
+        p_invalid: Probability of an invalid sample.
+        out: Path of the image file to write.
+    """
     names, dist = data["cities"], np.array(data["costs"])
     tours = sorted(all_tours(len(names)), key=lambda t: tour_length(t, dist))
     lengths = [tour_length(t, dist) for t in tours]
@@ -150,10 +190,8 @@ def plot_results(
     heights = [probs.get(tuple(t), 0.0) for t in tours]
     ax2.bar(labels + ["invalid"], heights + [p_invalid], color=colors + [GRAY])
     ax2.set(
-        title="Tour spectrum (orange = cheapest)",
-        xlabel="tour (cities in visiting order), sorted by cost"
-        if few
-        else "tour cost",
+        title="Tour spectrum",
+        xlabel="tour in visiting order, cheapest first" if few else "tour cost",
         ylabel="sampled probability",
     )
     ax2.tick_params(axis="x", rotation=60, labelsize=8)
@@ -162,7 +200,57 @@ def plot_results(
 
 
 def analyze(data: dict, out: Path, top: int = 10) -> None:
-    """Rank the samples, print the table, and save the figure."""
+    """Rank the samples, print the table, and save the figure.
+
+    Args:
+        data: Results from ``execution.run``.
+        out: Path of the image file to write.
+        top: Number of rows to print.
+    """
     ranked, p_invalid = rank_tours(data)
     print_ranking(data, ranked, p_invalid, top)
     plot_results(data, ranked, p_invalid, out)
+
+
+def plot_energy_histogram(energies, is_valid):
+    """Histogram of the energies of all bitstrings, stacked by validity.
+
+    Args:
+        energies: Energy of every bitstring, the diagonal of H_C.
+        is_valid: Boolean array, True where the bitstring is a valid tour.
+
+    Returns:
+        The matplotlib figure.
+    """
+    fig, ax = plt.subplots(figsize=(6, 3.5))
+    ax.hist(
+        [energies[~is_valid], energies[is_valid]],
+        bins=25,
+        stacked=True,
+        color=[GRAY, ORANGE],
+        label=["invalid", "valid tour"],
+    )
+    ax.set(xlabel="energy of bitstring", ylabel="number of bitstrings")
+    ax.legend()
+    return fig
+
+
+def plot_history(history):
+    """Plot <H_C> against energy evaluations, one line per restart.
+
+    Args:
+        history: Energies of every restart, from ``execution.run``.
+
+    Returns:
+        The matplotlib figure.
+    """
+    fig, ax = plt.subplots()
+    for k, energies in enumerate(history):
+        ax.plot(range(1, len(energies) + 1), energies, label=f"start {k}")
+    ax.set(
+        xlabel="energy evaluation",
+        ylabel=r"$\langle H_C\rangle$",
+        title="QAOA convergence",
+    )
+    ax.legend()
+    return fig

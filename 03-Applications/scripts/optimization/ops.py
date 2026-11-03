@@ -25,9 +25,17 @@ from qiskit.quantum_info import SparsePauliOp
 
 
 def load_problem(path: str | Path) -> tuple[list[str], np.ndarray]:
-    """Read a JSON file {"cities": [names], "costs": [[...]]}.
+    """Read a problem file of the form {"cities": [names], "costs": [[...]]}.
 
-    Returns the list of names and the cost matrix, after checking its shape.
+    Args:
+        path: Path of the JSON file.
+
+    Returns:
+        (names, costs): the city names and the cost matrix.
+
+    Raises:
+        ValueError: If the cost matrix is not square with one row per city,
+            or there are fewer than 3 cities.
     """
     data = json.loads(Path(path).read_text())
     names, costs = data["cities"], np.array(data["costs"], dtype=float)
@@ -41,19 +49,35 @@ def load_problem(path: str | Path) -> tuple[list[str], np.ndarray]:
 
 
 def var(city: int, pos: int, n: int) -> int:
-    """Qubit index of x[city, pos] for city, pos in 1..n-1 (n cities)."""
+    """Qubit index of the bit x[city, pos].
+
+    Args:
+        city: City, 1 to n - 1.
+        pos: Step of the tour, 1 to n - 1.
+        n: Number of cities.
+
+    Returns:
+        The qubit index.
+    """
     return (city - 1) * (n - 1) + (pos - 1)
 
 
 def tsp_qubo(dist: np.ndarray, penalty: float) -> tuple[np.ndarray, float]:
-    """Return (Q, offset) with Q upper triangular, so E(x) = x^T Q x + offset.
+    """QUBO matrix of the traveling salesman problem.
 
     Travel cost: add d(a, b) when city a is at step t and city b is at step
     t + 1, plus the legs out of and back to the fixed city 0.
 
     Penalty: for each city, A * (1 - sum_t x[c,t])^2 is zero only if the city
     is visited exactly once. For each step, A * (1 - sum_c x[c,t])^2 is zero
-    only if exactly one city is there. Here A is ``penalty``.
+    only if exactly one city is there.
+
+    Args:
+        dist: Cost matrix, dist[a, b] = cost of going from city a to city b.
+        penalty: Penalty weight A.
+
+    Returns:
+        (Q, offset) with Q upper triangular, so E(x) = x^T Q x + offset.
     """
     n = len(dist)
     m = n - 1
@@ -62,8 +86,11 @@ def tsp_qubo(dist: np.ndarray, penalty: float) -> tuple[np.ndarray, float]:
     cities = range(1, n)
 
     def add(i, j, w):
-        # Add w * x_i * x_j. For i == j this is w * x_i, because a bit
-        # squared is itself, so linear terms live on the diagonal of Q.
+        """Add w * x_i * x_j to Q.
+
+        For i == j this is w * x_i, because a bit squared is itself, so linear
+        terms live on the diagonal of Q.
+        """
         Q[min(i, j), max(i, j)] += w
 
     for c in cities:
@@ -88,12 +115,17 @@ def tsp_qubo(dist: np.ndarray, penalty: float) -> tuple[np.ndarray, float]:
 
 
 def qubo_to_ising(Q: np.ndarray, offset: float) -> SparsePauliOp:
-    """Substitute x = (1 - Z) / 2 to turn the QUBO into an Ising Hamiltonian.
-
-    The result has the form sum h_i Z_i + sum J_ij Z_i Z_j + const, using
+    """Substitute x = (1 - Z) / 2 to turn a QUBO into an Ising Hamiltonian.
 
         x_i       -> (1 - Z_i) / 2
         x_i x_j   -> (1 - Z_i - Z_j + Z_i Z_j) / 4
+
+    Args:
+        Q: Upper-triangular QUBO matrix.
+        offset: Constant term of the QUBO.
+
+    Returns:
+        sum h_i Z_i + sum J_ij Z_i Z_j + const as a sum of Pauli strings.
     """
     n = len(Q)
     h, const, terms = np.zeros(n), offset, []
@@ -112,7 +144,15 @@ def qubo_to_ising(Q: np.ndarray, offset: float) -> SparsePauliOp:
 
 
 def _z_label(n: int, *qubits: int) -> str:
-    """Pauli label with Z on the given qubits and I elsewhere."""
+    """Pauli label with Z on the given qubits and I elsewhere.
+
+    Args:
+        n: Total number of qubits.
+        *qubits: Qubits that get a Z.
+
+    Returns:
+        The label in Qiskit order, qubit 0 on the right.
+    """
     label = ["I"] * n
     for q in qubits:
         label[q] = "Z"
@@ -121,7 +161,14 @@ def _z_label(n: int, *qubits: int) -> str:
 
 
 def default_penalty(dist: np.ndarray) -> float:
-    """Twice the longest leg, so breaking a rule never pays."""
+    """Penalty weight large enough that breaking a rule never pays.
+
+    Args:
+        dist: Cost matrix.
+
+    Returns:
+        Twice the longest leg.
+    """
     return 2 * float(dist.max())
 
 
@@ -131,8 +178,16 @@ def build_hamiltonian(
     """Cost Hamiltonian for a cost matrix.
 
     Costs are divided by the longest leg first. That only rescales the
-    energies (the ranking of tours is unchanged), but it keeps the QAOA angles
-    in a sensible range whatever units the costs use.
+    energies and leaves the ranking of tours unchanged, but it keeps the QAOA
+    angles in a sensible range whatever units the costs use.
+
+    Args:
+        dist: Cost matrix.
+        penalty: Penalty weight for the scaled costs, or None for
+            ``default_penalty``.
+
+    Returns:
+        The Ising Hamiltonian H_C.
     """
     dist = np.asarray(dist) / np.max(dist)
     penalty = penalty if penalty is not None else default_penalty(dist)
@@ -140,10 +195,18 @@ def build_hamiltonian(
 
 
 def qubo_energy(bits: str, dist: np.ndarray, penalty: float) -> float:
-    """Classical QUBO energy of a bitstring in qubit order.
+    """Classical QUBO energy of a bitstring.
 
-    Use it to check the Hamiltonian: it should equal the diagonal entry of H
-    for the same bitstring (when ``dist`` is already scaled the same way).
+    It equals the diagonal entry of H for the same bitstring when ``dist`` is
+    scaled the same way, which makes it a check on the Hamiltonian.
+
+    Args:
+        bits: Bitstring in qubit order.
+        dist: Cost matrix.
+        penalty: Penalty weight.
+
+    Returns:
+        The energy E(x).
     """
     x = np.array([int(b) for b in bits], dtype=float)
     Q, offset = tsp_qubo(dist, penalty)

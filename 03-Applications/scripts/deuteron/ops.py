@@ -36,13 +36,21 @@ MAPPINGS = ("binary", "gray", "unary")
 def basis_hamiltonian(
     n_states: int, hbar_omega: float = HBAR_OMEGA, v0: float = V0
 ) -> np.ndarray:
-    """H = T + V in the first ``n_states`` S-wave oscillator states.
+    """Matrix of H = T + V in the first ``n_states`` S-wave oscillator states.
 
     T[n, n]   = (hw/2) (2n + 3/2)
     T[n, n+1] = -(hw/2) sqrt((n + 1)(n + 3/2))
     V[0, 0]   = -V0
 
     T couples each state only to its neighbors, so H is tridiagonal.
+
+    Args:
+        n_states: Number of oscillator states N.
+        hbar_omega: Oscillator spacing in MeV.
+        v0: Strength of the contact interaction in MeV.
+
+    Returns:
+        The N x N Hamiltonian in MeV.
     """
     H = np.zeros((n_states, n_states))
     for n in range(n_states):
@@ -55,13 +63,29 @@ def basis_hamiltonian(
 
 
 def check_states(n_states: int) -> None:
-    """The binary and Gray mappings need a power of two to fill the qubits."""
+    """Check that ``n_states`` is a power of two.
+
+    The binary and Gray mappings need a power of two to fill the qubits.
+
+    Args:
+        n_states: Number of oscillator states.
+
+    Raises:
+        ValueError: If ``n_states`` is not 2, 4, 8, ...
+    """
     if n_states < 2 or n_states & (n_states - 1):
         raise ValueError(f"n_states must be a power of two (2, 4, 8, ...), got {n_states}")
 
 
 def ground_energy(n_states: int) -> float:
-    """Lowest eigenvalue of the truncated Hamiltonian (any ``n_states``)."""
+    """Lowest eigenvalue of the truncated Hamiltonian.
+
+    Args:
+        n_states: Number of oscillator states, any positive integer.
+
+    Returns:
+        The ground-state energy in MeV.
+    """
     return float(np.linalg.eigvalsh(basis_hamiltonian(n_states))[0])
 
 
@@ -69,7 +93,18 @@ def ground_energy(n_states: int) -> float:
 
 
 def n_qubits(n_states: int, mapping: str) -> int:
-    """Qubits a mapping needs for ``n_states`` basis states."""
+    """Number of qubits a mapping needs.
+
+    Args:
+        n_states: Number of oscillator states.
+        mapping: Qubit mapping, one of ``MAPPINGS``.
+
+    Returns:
+        The qubit count.
+
+    Raises:
+        ValueError: If the mapping is unknown.
+    """
     if mapping == "unary":
         return n_states
     if mapping in ("binary", "gray"):
@@ -84,6 +119,16 @@ def encode(n: int, mapping: str) -> int:
     gray:   the Gray code of n, so neighbors n and n + 1 differ in one bit.
             The kinetic energy couples exactly such neighbors.
     unary:  one qubit per state, only qubit n is 1 ("one-hot").
+
+    Args:
+        n: Oscillator state index.
+        mapping: Qubit mapping, one of ``MAPPINGS``.
+
+    Returns:
+        The index of the qubit basis state.
+
+    Raises:
+        ValueError: If the mapping is unknown.
     """
     if mapping == "binary":
         return n
@@ -95,7 +140,15 @@ def encode(n: int, mapping: str) -> int:
 
 
 def _site(letters: dict[int, str], width: int) -> SparsePauliOp:
-    """Pauli string with the given letters on some qubits, I elsewhere."""
+    """Pauli string with the given letters on some qubits and I elsewhere.
+
+    Args:
+        letters: Pauli letter for each qubit index, for example {0: "Z"}.
+        width: Total number of qubits.
+
+    Returns:
+        The Pauli string as a one-term operator.
+    """
     label = ["I"] * width
     for qubit, letter in letters.items():
         label[qubit] = letter
@@ -113,9 +166,15 @@ def _unary_pauli(matrix: np.ndarray) -> SparsePauliOp:
 
     The operator is only fixed on the N states with one excitation. The other
     states are not oscillator states, and this form gives them whatever the
-    sum says (0 for no excitation). For the Hamiltonian they are sums of
+    sum says, 0 for no excitation. For the Hamiltonian they are sums of
     oscillator energies, and all but the ground state are positive, so none
     of them goes below the ground state.
+
+    Args:
+        matrix: N x N operator on the oscillator states.
+
+    Returns:
+        The operator on N qubits.
     """
     n = len(matrix)
     total = SparsePauliOp("I" * n, 0)
@@ -139,6 +198,13 @@ def to_pauli(matrix: np.ndarray, mapping: str) -> SparsePauliOp:
     A mapping is a relabeling of basis states: |n> becomes the qubit state
     encode(n). For binary and Gray every qubit state is some |n>, so moving
     the entries of the matrix to the new labels is the whole job.
+
+    Args:
+        matrix: N x N operator on the oscillator states.
+        mapping: Qubit mapping, one of ``MAPPINGS``.
+
+    Returns:
+        The operator as a sum of Pauli strings.
     """
     if mapping == "unary":
         return _unary_pauli(matrix).simplify(atol=1e-10)
@@ -151,13 +217,29 @@ def to_pauli(matrix: np.ndarray, mapping: str) -> SparsePauliOp:
 
 
 def ref_bits(n_states: int, mapping: str) -> str:
-    """Bitstring (Qiskit order, qubit 0 last) of the reference state |0>."""
+    """Bitstring of the reference state |0>, in Qiskit order with qubit 0 last.
+
+    Args:
+        n_states: Number of oscillator states.
+        mapping: Qubit mapping, one of ``MAPPINGS``.
+
+    Returns:
+        One character per qubit.
+    """
     width = n_qubits(n_states, mapping)
     return format(encode(0, mapping), f"0{width}b")
 
 
 def build_hamiltonian(n_states: int, mapping: str) -> SparsePauliOp:
-    """Qubit Hamiltonian of the deuteron in ``n_states`` oscillator states."""
+    """Qubit Hamiltonian of the deuteron in ``n_states`` oscillator states.
+
+    Args:
+        n_states: Number of oscillator states, a power of two.
+        mapping: Qubit mapping, one of ``MAPPINGS``.
+
+    Returns:
+        The Hamiltonian in MeV as a sum of Pauli strings.
+    """
     check_states(n_states)
     return to_pauli(basis_hamiltonian(n_states), mapping)
 
@@ -166,6 +248,12 @@ def rotation_generators(n_states: int) -> list[np.ndarray]:
     """Anti-Hermitian generators G_k = |k+1><k| - |k><k+1|, k = 0 .. N-2.
 
     exp(theta G_k) rotates amplitude from |k> into |k+1> by the angle theta.
+
+    Args:
+        n_states: Number of oscillator states N.
+
+    Returns:
+        The N - 1 generators, each an N x N matrix.
     """
     gens = []
     for k in range(n_states - 1):
@@ -176,12 +264,18 @@ def rotation_generators(n_states: int) -> list[np.ndarray]:
 
 
 def exact_energies(n_states: int) -> dict[str, float]:
-    """Reference energies.
+    """Reference energies for a basis of ``n_states`` states.
 
-    exact:      lowest eigenvalue of the N x N matrix (the answer to find).
-    ref:        energy of the state |0>, with no mixing of other states.
-    converged:  the same problem with a very large basis (N = 256).
-    experiment: the measured value.
+    Args:
+        n_states: Number of oscillator states.
+
+    Returns:
+        Energies in MeV, keyed by
+
+        exact:      lowest eigenvalue of the N x N matrix, the answer to find.
+        ref:        energy of the state |0>, with no mixing of other states.
+        converged:  the same problem in a very large basis, N = 256.
+        experiment: the measured value.
     """
     H = basis_hamiltonian(n_states)
     return {
