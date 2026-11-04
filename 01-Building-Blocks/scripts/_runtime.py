@@ -1,13 +1,14 @@
-"""Plumbing shared by the building-block example scripts.
+"""Plumbing shared by the Unit 1 notebooks and scripts.
 
-This file is not a lesson. It only answers one question for the scripts:
-"where do I run?" Each script asks for a list of *targets* (the Aer
-simulator, plus IBM hardware unless you pass --skip-hardware) and then runs
-the same steps against each one.
+This file is not a lesson. It only answers one question: "where do I run?"
+Each notebook or script asks for a list of *targets* (the Aer simulator, plus
+IBM hardware if you ask for it) and then runs the same steps against each
+one. A notebook asks with `skip_hardware=False` in its SETTINGS cell; a
+script asks with the --hardware option.
 
-Everything that teaches a Qiskit concept -- building the circuit,
-transpiling it, writing the observable, assembling the PUB, running the job,
-and reading the result -- stays in the scripts themselves so you can see it.
+Everything that teaches a Qiskit concept stays in the notebooks and scripts
+themselves so you can see it: the Encoding, Operator, Execution and Analysis
+steps of the recipe.
 
 A note on reading results: Qiskit prints bitstrings with qubit 0 on the
 *right*. The counts key "01" means qubit 1 = 0 and qubit 0 = 1.
@@ -132,7 +133,7 @@ def make_parser(description: str) -> argparse.ArgumentParser:
     -------
     argparse.ArgumentParser
         A parser with --shots, --precision, --backend, --name,
-        --skip-hardware and --poll-interval.
+        --hardware and --poll-interval.
     """
     parser = argparse.ArgumentParser(
         description=description, formatter_class=argparse.RawDescriptionHelpFormatter
@@ -162,8 +163,13 @@ def make_parser(description: str) -> argparse.ArgumentParser:
     parser.add_argument(
         "--name", default="default", help="Saved account name (default: 'default')."
     )
+    # The simulator is the default, as in the notebooks' SETTINGS cell, so a
+    # script finishes in seconds. --hardware sets skip_hardware to False.
     parser.add_argument(
-        "--skip-hardware", action="store_true", help="Only run on the Aer simulator."
+        "--hardware",
+        dest="skip_hardware",
+        action="store_false",
+        help="Also run on IBM hardware (default: only the Aer simulator).",
     )
     parser.add_argument(
         "--poll-interval",
@@ -217,7 +223,7 @@ def get_targets(args) -> list[Target]:
     -------
     list[Target]
         Always starts with the noiseless Aer simulator. IBM hardware is
-        appended unless --skip-hardware was given or the connection failed.
+        appended only if hardware was asked for and the connection worked.
     """
     # AerSimulator is a "backend" like any other, so we can transpile for it
     # with exactly the same call we use for hardware. The simulator accepts
