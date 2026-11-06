@@ -110,7 +110,9 @@ def plot_panel(ax_top, ax_res, name: str, record: dict, result: dict) -> None:
     p = result["params"]
 
     ax_top.plot(t, y, "o", color=color, ms=4, label="measured")
-    ax_top.plot(fine, curve(name, result, fine), "-", color="black", lw=1.5, label="fit")
+    ax_top.plot(
+        fine, curve(name, result, fine), "-", color="black", lw=1.5, label="fit"
+    )
     if name == "t2star":
         # The decay envelope that the oscillation sits inside.
         env = p["amp"] * np.exp(-fine / p["tau"])
@@ -183,7 +185,7 @@ def plot_fits(data: dict, fits: dict):
             axes[0, col], axes[1, col], name, data["experiments"][name], fits[name]
         )
         axes[0, col].tick_params(labelbottom=False)
-    fig.suptitle(f"Coherence fits ({data['backend']})", y=1.02)
+    fig.suptitle(f"Decay fits ({data['backend']})", y=1.02)
     return fig
 
 
@@ -253,7 +255,9 @@ def plot_checks(name: str, record: dict, result: dict):
         coef = np.linalg.lstsq(basis, y, rcond=None)[0]
         cost.append(np.sum((y - basis @ coef) ** 2))
     right.plot(taus, cost, "-", color=color)
-    right.axvspan(p["tau"] - err["tau"], p["tau"] + err["tau"], color="gray", alpha=0.25)
+    right.axvspan(
+        p["tau"] - err["tau"], p["tau"] + err["tau"], color="gray", alpha=0.25
+    )
     right.axvline(p["tau"], color="black", lw=1)
     right.set_xlabel("trial time constant ($\\mu$s)")
     right.set_ylabel("sum of squared residuals")

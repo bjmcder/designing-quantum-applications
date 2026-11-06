@@ -36,7 +36,7 @@ The 24 Cliffords are the gates that map each of the six states |0>, |1>,
 and S, by repeatedly applying either one until nothing new appears.
 """
 
-from functools import lru_cache
+from functools import cache
 
 import numpy as np
 from qiskit import QuantumCircuit
@@ -58,7 +58,7 @@ def _gate(name: str) -> Clifford:
     return Clifford(qc)
 
 
-@lru_cache(maxsize=None)
+@cache
 def clifford_table() -> tuple:
     """All 24 single-qubit Cliffords, each with a gate sequence that makes it.
 

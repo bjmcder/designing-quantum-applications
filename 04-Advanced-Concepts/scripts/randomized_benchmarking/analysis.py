@@ -17,8 +17,6 @@ On the simulator the table also shows the values that follow from the noise
 that was built in, so you can check the fit against the truth.
 """
 
-from pathlib import Path
-
 import matplotlib
 
 matplotlib.use("Agg")  # draw to files; notebooks switch back to inline
@@ -76,7 +74,9 @@ def print_table(data: dict, result: dict) -> None:
     p, pe = result["params"]["p"], result["errors"]["p"]
     print(f"{'':<28} {'fit':>20} {'built in':>10}")
     built = (lambda x, f: f"{x:>10{f}}") if truth else (lambda x, f: f"{'-':>10}")
-    print(f"{'decay rate p':<28} {p:>12.5f} +/- {pe:<6.5f} {built(truth['p'] if truth else 0, '.5f')}")
+    print(
+        f"{'decay rate p':<28} {p:>12.5f} +/- {pe:<6.5f} {built(truth['p'] if truth else 0, '.5f')}"
+    )
     print(
         f"{'error per Clifford r':<28} {result['epc']:>12.5f} +/- "
         f"{result['epc_error']:<6.5f} {built(truth['epc'] if truth else 0, '.5f')}"
@@ -179,7 +179,7 @@ def plot_spam(runs: dict):
             show_sequences=False,
         )
     ax.set_xlabel("sequence length (Cliffords)")
-    ax.set_title("Same gates, different read-out error")
+    ax.set_title("Survival with two read-out errors")
     return fig
 
 
@@ -196,7 +196,7 @@ def analyze(data: dict, path=None) -> dict:
     result = fit(data)
     print_table(data, result)
     fig = plot_fit(data, result)
-    fig.axes[0].set_title(f"Randomized benchmarking ({data['backend']})")
+    fig.axes[0].set_title(f"Survival against sequence length, {data['backend']}")
     if path is not None:
         fig.savefig(path, dpi=150, bbox_inches="tight")
     return result

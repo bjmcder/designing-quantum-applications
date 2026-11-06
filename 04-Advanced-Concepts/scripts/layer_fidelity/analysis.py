@@ -88,7 +88,13 @@ def fit_layer(data: dict) -> dict:
     value = eplg(lf, n)
     # d(EPLG)/d(LF) = -(4/5) (1/n) LF^(1/n - 1)
     value_err = 0.8 / n * lf ** (1 / n - 1) * lf_err
-    return {"links": links, "lf": lf, "lf_error": lf_err, "eplg": value, "eplg_error": value_err}
+    return {
+        "links": links,
+        "lf": lf,
+        "lf_error": lf_err,
+        "eplg": value,
+        "eplg_error": value_err,
+    }
 
 
 def print_table(data: dict, result: dict) -> None:
@@ -109,8 +115,12 @@ def print_table(data: dict, result: dict) -> None:
         )
     built_lf = f"{truth['lf']:.4f}" if truth else "-"
     built_eplg = f"{truth['eplg']:.4f}" if truth else "-"
-    print(f"\nlayer fidelity LF = {result['lf']:.4f} +/- {result['lf_error']:.4f}   (built in: {built_lf})")
-    print(f"EPLG              = {result['eplg']:.4f} +/- {result['eplg_error']:.4f}   (built in: {built_eplg})")
+    print(
+        f"\nlayer fidelity LF = {result['lf']:.4f} +/- {result['lf_error']:.4f}   (built in: {built_lf})"
+    )
+    print(
+        f"EPLG              = {result['eplg']:.4f} +/- {result['eplg_error']:.4f}   (built in: {built_eplg})"
+    )
 
 
 def plot_links(data: dict, result: dict):
@@ -125,8 +135,12 @@ def plot_links(data: dict, result: dict):
     """
     names = list(result["links"])
     fig, axes = plt.subplots(
-        1, len(names), figsize=(4.6 * len(names), 4), sharey=True,
-        gridspec_kw={"wspace": 0.08}, squeeze=False,
+        1,
+        len(names),
+        figsize=(4.6 * len(names), 4),
+        sharey=True,
+        gridspec_kw={"wspace": 0.08},
+        squeeze=False,
     )
     for ax, name, color in zip(axes[0], names, COLORS):
         link = result["links"][name]
@@ -157,12 +171,20 @@ def plot_layer(data: dict, result: dict):
     pf_err = np.array([result["links"][n]["pf_error"] for n in names])
     truth = data["truth"]
 
-    fig, (left, right) = plt.subplots(1, 2, figsize=(10, 4), gridspec_kw={"wspace": 0.3})
+    fig, (left, right) = plt.subplots(
+        1, 2, figsize=(10, 4), gridspec_kw={"wspace": 0.3}
+    )
     x = np.arange(len(names))
     left.bar(x, pf, yerr=pf_err, color=COLORS[: len(names)], capsize=4)
     if truth:
         left.plot(
-            x, [truth[n]["pf"] for n in names], "D", mfc="white", mec="black", ms=8, label="built in"
+            x,
+            [truth[n]["pf"] for n in names],
+            "D",
+            mfc="white",
+            mec="black",
+            ms=8,
+            label="built in",
         )
         left.legend()
     left.set_xticks(x, names)
@@ -174,7 +196,13 @@ def plot_layer(data: dict, result: dict):
     k = np.arange(1, len(names) + 1)
     right.plot(k, np.cumprod(pf), "o-", color="black")
     if truth:
-        right.plot(k, np.cumprod([truth[n]["pf"] for n in names]), "s--", color="gray", label="built in")
+        right.plot(
+            k,
+            np.cumprod([truth[n]["pf"] for n in names]),
+            "s--",
+            color="gray",
+            label="built in",
+        )
         right.legend()
     right.set_xticks(k)
     right.set_xlabel("number of links in the chain")
@@ -200,6 +228,8 @@ def analyze(data: dict, path=None) -> dict:
     fig2 = plot_layer(data, result)
     if path is not None:
         path = Path(path)
-        fig1.savefig(path.with_name(path.stem + "_links.png"), dpi=150, bbox_inches="tight")
+        fig1.savefig(
+            path.with_name(path.stem + "_links.png"), dpi=150, bbox_inches="tight"
+        )
         fig2.savefig(path, dpi=150, bbox_inches="tight")
     return result

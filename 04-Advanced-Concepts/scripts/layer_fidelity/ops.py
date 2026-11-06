@@ -13,7 +13,7 @@ Layer fidelity does that for a chain of N qubits joined by N - 1 links:
        the even links (0-1, 2-3, ...) and the odd links (1-2, 3-4, ...).
     2. For each layer, run randomized benchmarking on every link of the layer
        at the same time, each with its own random two-qubit Cliffords. Running
-       them together includes the interference between neighbors.
+       them together includes the crosstalk between neighbors.
     3. Fit the decay of each link. Convert its decay rate to a process
        fidelity.
     4. Multiply the N - 1 process fidelities. The product is the layer

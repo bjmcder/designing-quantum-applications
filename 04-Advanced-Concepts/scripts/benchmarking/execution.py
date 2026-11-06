@@ -154,6 +154,12 @@ def run(
         "truth": simulator_truth() if simulated else None,
         "experiments": {},
     }
+    # The Aer Estimator reads the exact expectation value and skips the
+    # read-out error, so apply it here. A read-out that turns 0 into 1 with
+    # probability p01 and 1 into 0 with probability p10 maps a true value v
+    # to (1 - p01 - p10) v + (p10 - p01).
+    p01, p10 = SIM_READOUT
+    scale, shift_ro = (1 - p01 - p10, p10 - p01) if simulated else (1.0, 0.0)
     k = 0
     for name, times in layout:
         evs, stds = [], []
@@ -161,8 +167,10 @@ def run(
             res = result[k].data
             k += 1
             # The simulator gives an array over offsets; hardware a number.
-            evs.append(float(np.mean(res.evs)))
-            stds.append(float(np.sqrt(np.mean(np.square(res.stds)) / np.size(res.evs))))
+            ev = float(np.mean(res.evs))
+            std = float(np.sqrt(np.mean(np.square(res.stds)) / np.size(res.evs)))
+            evs.append(scale * ev + shift_ro)
+            stds.append(scale * std)
         data["experiments"][name] = {
             "times_us": [float(t) for t in times],
             "evs": evs,

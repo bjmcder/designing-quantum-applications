@@ -16,14 +16,12 @@ import numpy as np
 from encoding import build_circuit
 from ops import STEP, T1, T2, relaxation_kraus
 from qiskit import transpile
-from qiskit.quantum_info import DensityMatrix, Operator, Pauli
+from qiskit.quantum_info import Pauli
 from qiskit_aer import AerSimulator
 from qiskit_aer.noise import NoiseModel, kraus_error
 
 
-def make_noise_model(
-    step: float = STEP, t1: float = T1, t2: float = T2
-) -> NoiseModel:
+def make_noise_model(step: float = STEP, t1: float = T1, t2: float = T2) -> NoiseModel:
     """Noise model in which every id gate lasts ``step`` and has T1 and T2.
 
     Args:

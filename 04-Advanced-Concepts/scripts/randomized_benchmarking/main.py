@@ -32,15 +32,23 @@ def main() -> int:
     """
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument("--backend", help="IBM backend name (default: Aer simulator).")
-    parser.add_argument("--qubit", type=int, default=0, help="Physical qubit on hardware.")
     parser.add_argument(
-        "--lengths", type=int, nargs="+", default=list(LENGTHS), help="Sequence lengths."
+        "--qubit", type=int, default=0, help="Physical qubit on hardware."
+    )
+    parser.add_argument(
+        "--lengths",
+        type=int,
+        nargs="+",
+        default=list(LENGTHS),
+        help="Sequence lengths.",
     )
     parser.add_argument(
         "--sequences", type=int, default=20, help="Random sequences per length."
     )
     parser.add_argument("--shots", type=int, default=1000, help="Shots per sequence.")
-    parser.add_argument("--seed", type=int, default=1, help="Seed of the random sequences.")
+    parser.add_argument(
+        "--seed", type=int, default=1, help="Seed of the random sequences."
+    )
     args = parser.parse_args()
 
     data = run(

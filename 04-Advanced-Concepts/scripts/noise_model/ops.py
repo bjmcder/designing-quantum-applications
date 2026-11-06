@@ -99,7 +99,7 @@ def phase_damping(t: float, t1: float, t2: float) -> list[np.ndarray]:
     Returns:
         [K_0, K_1].
     """
-    l = 1 - np.exp(-2 * t / dephasing_time(t1, t2))  # noqa: E741
+    l = 1 - np.exp(-2 * t / dephasing_time(t1, t2))
     k0 = np.array([[1, 0], [0, np.sqrt(1 - l)]])
     k1 = np.array([[0, 0], [0, np.sqrt(l)]])
     return [k0, k1]

@@ -12,8 +12,6 @@ The bottom row of the figure shows their difference, which should be
 at the level of rounding error.
 """
 
-from pathlib import Path
-
 import matplotlib
 
 matplotlib.use("Agg")  # draw to files; notebooks switch back to inline
@@ -93,9 +91,7 @@ def plot_compare(results: dict, path=None):
     for col, (name, c) in enumerate(results.items()):
         top, bottom = axes[0, col], axes[1, col]
         top.plot(c["t"], c["ideal"], "--", color="gray", label="ideal (no noise)")
-        top.plot(
-            c["t"], c["formula"], "-", color="black", lw=2, label="formula"
-        )
+        top.plot(c["t"], c["formula"], "-", color="black", lw=2, label="formula")
         top.plot(
             c["t"],
             c["model"],

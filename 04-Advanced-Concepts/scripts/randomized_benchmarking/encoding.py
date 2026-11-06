@@ -10,7 +10,6 @@ between Cliffords keeps the compiler from merging neighbors, which would
 shorten the sequence and hide the errors we want to measure.
 """
 
-import numpy as np
 from ops import clifford_table
 from qiskit import QuantumCircuit
 from qiskit.transpiler.preset_passmanagers import generate_preset_pass_manager

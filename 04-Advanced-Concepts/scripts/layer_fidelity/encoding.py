@@ -57,9 +57,7 @@ def transpile_for(circuit: QuantumCircuit, backend, chain: list[int] | None = No
         The compiled circuit.
     """
     if backend is None:
-        return transpile(
-            circuit, basis_gates=["cx", "sx", "rz"], optimization_level=0
-        )
+        return transpile(circuit, basis_gates=["cx", "sx", "rz"], optimization_level=0)
     pm = generate_preset_pass_manager(
         backend=backend, optimization_level=0, initial_layout=chain
     )

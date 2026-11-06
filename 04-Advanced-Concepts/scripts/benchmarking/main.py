@@ -35,15 +35,11 @@ def main() -> int:
     parser.add_argument(
         "--experiments", nargs="+", choices=EXPERIMENTS, default=list(EXPERIMENTS)
     )
-    parser.add_argument(
-        "--backend", help="IBM backend name (default: Aer simulator)."
-    )
+    parser.add_argument("--backend", help="IBM backend name (default: Aer simulator).")
     parser.add_argument(
         "--qubit", type=int, default=0, help="Physical qubit on hardware."
     )
-    parser.add_argument(
-        "--points", type=int, default=41, help="Delays per experiment."
-    )
+    parser.add_argument("--points", type=int, default=41, help="Delays per experiment.")
     parser.add_argument(
         "--precision",
         type=float,

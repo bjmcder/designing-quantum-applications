@@ -40,11 +40,19 @@ def main() -> int:
         "--n-qubits", type=int, default=4, help="Chain length on the simulator."
     )
     parser.add_argument(
-        "--lengths", type=int, nargs="+", default=list(LENGTHS), help="Sequence lengths."
+        "--lengths",
+        type=int,
+        nargs="+",
+        default=list(LENGTHS),
+        help="Sequence lengths.",
     )
-    parser.add_argument("--sequences", type=int, default=20, help="Random sequences per length.")
+    parser.add_argument(
+        "--sequences", type=int, default=20, help="Random sequences per length."
+    )
     parser.add_argument("--shots", type=int, default=500, help="Shots per circuit.")
-    parser.add_argument("--seed", type=int, default=1, help="Seed of the random sequences.")
+    parser.add_argument(
+        "--seed", type=int, default=1, help="Seed of the random sequences."
+    )
     parser.add_argument(
         "--isolated",
         action="store_true",
